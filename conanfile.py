@@ -15,10 +15,11 @@ class BrainflowConan(ConanFile):
     # Binary configuration
     settings = "os", "compiler", "build_type", "arch"
     options = {"libftdi": [True, False], "openmp": [True, False], "onnx": [True, False], "bluetooth": [True, False],
-               "ble": [True, False], "periphery": [True, False], "oymotion": [True, False],"synchroni": [True, False],
-               "static_msvc_runtime": [True, False]}
+               "ble": [True, False], "periphery": [True, False], "oymotion": [True, False], "synchroni": [True, False],
+               "ant_edx": [True, False], "static_msvc_runtime": [True, False]}
     default_options = {"libftdi": False, "openmp": False, "onnx": True, "bluetooth": True,
-                       "ble": True, "periphery": False, "oymotion": False,"synchroni": True, "static_msvc_runtime": True}
+                       "ble": True, "periphery": False, "oymotion": False, "synchroni": True,
+                       "ant_edx": False, "static_msvc_runtime": True}
 
     # Sources are located in the same place as this recipe, copy them to the recipe
     exports_sources = "CMakeLists.txt", "src/*", "third_party/*", "cpp_package/build.cmake", "cpp_package/src/*", "cmake/*"
@@ -29,7 +30,12 @@ class BrainflowConan(ConanFile):
             del self.options.periphery
         else:
             del self.options.oymotion
-            del self.options.msvc_runtime
+            del self.options.static_msvc_runtime
+
+    def requirements(self):
+        if self.options.ant_edx:
+            self.requires("protobuf/3.21.12")
+            self.requires("grpc/1.54.3")
 
     def build(self):
         cmake = CMake(self)
@@ -52,6 +58,8 @@ class BrainflowConan(ConanFile):
             cmake.definitions["USE_PERIPHERY"] = "ON"
         if self.settings.os == "Windows" and self.options.oymotion:
             cmake.definitions["BUILD_OYMOTION_SDK"] = "ON"
+        if self.options.ant_edx:
+            cmake.definitions["BUILD_ANT_EDX"] = "ON"
         if self.settings.os == "Windows" and self.options.static_msvc_runtime:
             cmake.definitions["MSVC_RUNTIME"] = "static"
         else:
