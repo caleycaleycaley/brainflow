@@ -30,7 +30,12 @@ impl BoardShim {
         let json_brainflow_input_params = CString::new(json_brainflow_input_params)?;
         let master_board_id =
             if let BoardIds::StreamingBoard | BoardIds::PlaybackFileBoard | BoardIds::AntNeuroEdxBoard = board_id {
-                num::FromPrimitive::from_usize(*input_params.master_board()).unwrap()
+                let master_board_raw = *input_params.master_board();
+                if master_board_raw == BoardIds::NoBoard as usize {
+                    return Err(crate::BrainFlowError::InvalidArgumentsError.into());
+                }
+                num::FromPrimitive::from_usize(master_board_raw)
+                    .ok_or(crate::BrainFlowError::InvalidArgumentsError)?
             } else {
                 board_id
             };

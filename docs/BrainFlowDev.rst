@@ -57,6 +57,8 @@ Instructions to add new boards to BrainFlow
 - if your board uses optional external dependencies, add a CMake option (for example :code:`BUILD_ANT_EDX`) to keep default builds dependency-light.
 - for EDX transport builds on Windows, use :code:`-DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic` and provide gRPC/protobuf via your toolchain (for example vcpkg).
 - for EDX transport builds on Linux, enable :code:`-DBUILD_ANT_EDX=ON` and ensure :code:`protoc`, gRPC and protobuf development packages are available.
+- for :code:`ANT_NEURO_EDX_BOARD (66)`, require :code:`master_board` and endpoint via :code:`ip_address`/:code:`ip_port`; do not use :code:`other_info` for endpoint.
+- for :code:`ANT_NEURO_EDX_BOARD (66)`, keep runtime data shape derived from :code:`master_board` for cross-binding compatibility.
 - create a PR
 
 **You've just written Python, Java, C#, R, C++ ... SDKs for your board! Also, now you can use your new board with applications and frameworks built on top of BrainFlow API.**

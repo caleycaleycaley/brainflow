@@ -164,6 +164,16 @@ export class BoardShim
     constructor(boardId: BoardIds, inputParams: Partial<IBrainFlowInputParams>)
     {
         this.boardId = boardId;
+        if ((boardId === BoardIds.STREAMING_BOARD ||
+                boardId === BoardIds.PLAYBACK_FILE_BOARD ||
+                boardId === BoardIds.ANT_NEURO_EDX_BOARD) &&
+            (!inputParams.masterBoard || inputParams.masterBoard === BoardIds.NO_BOARD))
+        {
+            throw new BrainFlowError (
+                BrainFlowExitCodes.INVALID_ARGUMENTS_ERROR,
+                'You need to provide master board id for streaming/playback/EDX boards',
+            );
+        }
         this.masterBoardId =
             ((boardId === BoardIds.STREAMING_BOARD ||
                 boardId === BoardIds.PLAYBACK_FILE_BOARD ||

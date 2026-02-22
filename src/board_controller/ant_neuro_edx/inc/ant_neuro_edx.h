@@ -52,6 +52,10 @@ private:
     uint64_t fallback_timestamp_count;
     uint64_t non_monotonic_timestamp_count;
     uint64_t large_gap_count;
+    uint64_t impedance_payload_values_total;
+    uint64_t impedance_rows_mapped;
+    uint64_t impedance_rows_truncated_count;
+    bool impedance_truncation_logged;
     double last_emitted_timestamp;
 #ifdef BUILD_ANT_EDX
     std::shared_ptr<grpc::Channel> grpc_channel;
