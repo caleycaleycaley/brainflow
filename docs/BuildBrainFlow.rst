@@ -208,6 +208,15 @@ Windows
         # to get info about args and configure your build you can run
         python build.py --help
 
+.. compound::
+
+    EDX profile on Windows (gRPC transport) example: ::
+
+        mkdir build-edx
+        cd build-edx
+        cmake -G "Visual Studio 17 2022" -A x64 -DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic -DCMAKE_INSTALL_PREFIX=../installed-edx ..
+        cmake --build . --target install --config Release -j 2 --parallel 2
+
 
 Linux
 ~~~~~~
@@ -226,6 +235,17 @@ Linux
         python3 build.py
         # to get info about args and configure your build you can run
         python3 build.py --help
+
+.. compound::
+
+    EDX profile on Linux example: ::
+
+        # install grpc/protobuf development dependencies first
+        mkdir build-edx
+        cd build-edx
+        cmake -DBUILD_ANT_EDX=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../installed-edx ..
+        make
+        make install
 
 MacOS
 ~~~~~~~
