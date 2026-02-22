@@ -144,6 +144,16 @@ namespace
             return {};
         }
     }
+
+    void append_impedance_values (
+        const google::protobuf::RepeatedPtrField<EdigRPC::gen::TupleImpledanceChannel> &src,
+        std::vector<double> &dst)
+    {
+        for (const auto &entry : src)
+        {
+            dst.push_back ((double)entry.value ());
+        }
+    }
 } // namespace
 
 AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params)
@@ -165,6 +175,10 @@ AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params)
     fallback_timestamp_count = 0;
     non_monotonic_timestamp_count = 0;
     large_gap_count = 0;
+    impedance_payload_values_total = 0;
+    impedance_rows_mapped = 0;
+    impedance_rows_truncated_count = 0;
+    impedance_truncation_logged = false;
     last_emitted_timestamp = -1.0;
 }
 
@@ -682,14 +696,34 @@ int AntNeuroEdxBoard::process_frames ()
             std::fill (package.begin (), package.end (), 0.0);
             const std::vector<int> &impedance_rows =
                 impedance_channel_rows.empty () ? resistance_channels : impedance_channel_rows;
-            int idx = 0;
-            for (const auto &entry : frame.impedance ().channels ())
+            std::vector<double> impedance_values;
+            impedance_values.reserve ((size_t)frame.impedance ().channels_size () +
+                (size_t)frame.impedance ().reference_size () +
+                (size_t)frame.impedance ().ground_size ());
+            append_impedance_values (frame.impedance ().channels (), impedance_values);
+            append_impedance_values (frame.impedance ().reference (), impedance_values);
+            append_impedance_values (frame.impedance ().ground (), impedance_values);
+
+            impedance_payload_values_total += (uint64_t)impedance_values.size ();
+            impedance_rows_mapped = (uint64_t)impedance_rows.size ();
+            if (impedance_values.size () > impedance_rows.size ())
             {
-                if (idx >= (int)impedance_rows.size ())
+                impedance_rows_truncated_count +=
+                    (uint64_t)(impedance_values.size () - impedance_rows.size ());
+                if (!impedance_truncation_logged)
                 {
-                    break;
+                    safe_logger (spdlog::level::warn,
+                        "EDX impedance payload has more values ({}) than mapped rows ({}). "
+                        "Extra values are truncated.",
+                        impedance_values.size (), impedance_rows.size ());
+                    impedance_truncation_logged = true;
                 }
-                package[(size_t)impedance_rows[(size_t)idx++]] = (double)entry.value ();
+            }
+
+            size_t mapped = std::min (impedance_values.size (), impedance_rows.size ());
+            for (size_t i = 0; i < mapped; i++)
+            {
+                package[(size_t)impedance_rows[i]] = impedance_values[i];
             }
             package[(size_t)package_num_channel] = (double)package_num++;
             package[(size_t)timestamp_channel] = frame_base_ts;
@@ -816,6 +850,10 @@ int AntNeuroEdxBoard::start_stream (int buffer_size, const char *streamer_params
     large_gap_count = 0;
     fallback_timestamp_count = 0;
     missing_start_frame_count = 0;
+    impedance_payload_values_total = 0;
+    impedance_rows_mapped = 0;
+    impedance_rows_truncated_count = 0;
+    impedance_truncation_logged = false;
     keep_alive = true;
     state = (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
     streaming_thread = std::thread ([this] { read_thread (); });
@@ -1072,6 +1110,9 @@ int AntNeuroEdxBoard::config_board (std::string config, std::string &response)
             {"non_monotonic_timestamp_count", non_monotonic_timestamp_count},
             {"large_gap_count", large_gap_count},
             {"last_emitted_timestamp", last_emitted_timestamp}};
+        info["impedance"] = {{"impedance_payload_values_total", impedance_payload_values_total},
+            {"impedance_rows_mapped", impedance_rows_mapped},
+            {"impedance_rows_truncated_count", impedance_rows_truncated_count}};
         response = info.dump ();
         return (int)BrainFlowExitCodes::STATUS_OK;
     }

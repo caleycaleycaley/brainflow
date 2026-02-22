@@ -245,6 +245,13 @@ Windows
         cmake -G "Visual Studio 17 2022" -A x64 -DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic -DCMAKE_INSTALL_PREFIX=../installed-edx ..
         cmake --build . --target install --config Release -j 2 --parallel 2
 
+    Runtime contract for :code:`ANT_NEURO_EDX_BOARD (66)`:
+
+    - :code:`master_board` is required.
+    - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
+    - :code:`other_info` is not supported for EDX endpoint configuration.
+    - Runtime row layout is derived from :code:`master_board`.
+
 
 Linux
 ~~~~~~
@@ -278,6 +285,13 @@ Linux
         cmake -DBUILD_ANT_EDX=ON -DBUILD_SYNCHRONI_SDK=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../installed-edx ..
         make
         make install
+
+    Runtime contract for :code:`ANT_NEURO_EDX_BOARD (66)`:
+
+    - :code:`master_board` is required.
+    - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
+    - :code:`other_info` is not supported for EDX endpoint configuration.
+    - Runtime row layout is derived from :code:`master_board`.
 
 MacOS
 ~~~~~~~
