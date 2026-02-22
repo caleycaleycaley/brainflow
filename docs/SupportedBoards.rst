@@ -1118,10 +1118,16 @@ Ant Neuro has many devices and all of them are supported by BrainFlow:
 - :code:`ANT_NEURO_EE_224_BOARD`
 - :code:`ANT_NEURO_EE_225_BOARD`
 - :code:`ANT_NEURO_EE_511_BOARD`
+- :code:`ANT_NEURO_EDX_BOARD` (EDX network transport)
 
 The following fields of BrainFlowInputParams object are supported:
 
 - *optional:* :code:`serial_number`, important if you have multiple devices in the same place, can be found on the amplifier label (if not provided, BrainFlow will try to autodiscover the device)
+- for :code:`ANT_NEURO_EDX_BOARD`:
+    - :code:`ip_address` (required), EDX host
+    - :code:`ip_port` (required), EDX port
+    - :code:`ip_protocol` (optional), supports :code:`EDX`
+    - :code:`master_board` (required), one of ANT board ids from :code:`ANT_NEURO_EE_410_BOARD` to :code:`ANT_NEURO_EE_225_BOARD` or :code:`ANT_NEURO_EE_511_BOARD`
 
 
 Initialization example:
@@ -1130,6 +1136,47 @@ Initialization example:
 
     params = BrainFlowInputParams()
     board = BoardShim(BoardIds.ANT_NEURO_EE_410_BOARD, params)  # 8 channel amplifier
+
+EDX transport example:
+
+.. code-block:: python
+
+    params = BrainFlowInputParams()
+    params.ip_address = "localhost"
+    params.ip_port = 3390
+    params.ip_protocol = IpProtocolTypes.EDX
+    params.master_board = BoardIds.ANT_NEURO_EE_411_BOARD
+    board = BoardShim(BoardIds.ANT_NEURO_EDX_BOARD, params)
+
+Migration from direct ANT transport:
+
+- Use :code:`ANT_NEURO_EDX_BOARD` as board id.
+- Move device endpoint to :code:`params.ip_address` + :code:`params.ip_port`.
+- Set :code:`params.master_board` to the target ANT model id (:code:`ANT_NEURO_EE_4xx`, :code:`ANT_NEURO_EE_2xx`, :code:`ANT_NEURO_EE_511`).
+- Keep existing BrainFlow lifecycle and data APIs unchanged (:code:`prepare_session`, :code:`start_stream`, :code:`get_board_data`, :code:`stop_stream`, :code:`release_session`).
+
+Model Alias Normalization (EDX)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For EDX device matching, BrainFlow normalizes ANT model aliases to canonical tokens.
+
++-------------------+-----------------------+----------------------+
+| Family            | Accepted aliases      | Canonical form       |
++===================+=======================+======================+
+| EE-2xx            | ``EE2xx``, ``EE-2xx``| ``EE-2xx``           |
++-------------------+-----------------------+----------------------+
+| EE-4xx            | ``EE4xx``, ``EE-4xx``| ``EE-4xx``           |
++-------------------+-----------------------+----------------------+
+| EE-5xx            | ``EE5xx``, ``EE-5xx``| ``EE-5xx``           |
++-------------------+-----------------------+----------------------+
+| EE-511 (example)  | ``EE511``, ``EE-511``| ``EE-511``           |
++-------------------+-----------------------+----------------------+
+
+Notes:
+
+- :code:`master_board` stays the source of truth for BrainFlow channel layout and metadata.
+- Alias normalization is only used to match EDX-reported model text to the requested ANT family.
+- If multiple devices match, :code:`serial_number` is used as tie-breaker.
 
 `More elaborate example <https://github.com/brainflow-dev/brainflow/blob/master/python_package/examples/tests/eego_impedances_and_eeg.py>`_ (reading EEG and impedances)
 
@@ -1145,6 +1192,25 @@ Available commands:
 - Set sampling rate: :code:`board.config_board("sampling_rate:500")`, for available values check docs from Ant Neuro.
 - Set reference range: :code:`board.config_board("reference_range:1.0")`, for available values check docs from Ant Neuro.
 - Set bipolar range: :code:`board.config_board("bipolar_range:2.5")`, for available values check docs from Ant Neuro.
+- EDX capabilities: :code:`board.config_board("edx:get_capabilities")`.
+- EDX mode query: :code:`board.config_board("edx:get_mode")`.
+- EDX power query: :code:`board.config_board("edx:get_power")`.
+
+Timestamp behavior for EDX transport:
+
+- BrainFlow keeps the master-board channel layout unchanged (no extra timing info channel is added).
+- If EDX frame ``Start`` is present, it is used as frame anchor time.
+- For multi-sample frames, per-sample timestamps are interpolated as ``Start + i/sampling_rate``.
+- If ``Start`` is missing, host receive time fallback is used for that frame.
+- Idle and impedance transitions preserve real timeline gaps (no synthetic backfill across missing EEG intervals).
+- Timing diagnostics are exposed in :code:`get_info` JSON under the :code:`timing` object.
+
+EDX troubleshooting:
+
+- :code:`BOARD_NOT_READY_ERROR` during prepare/start usually means endpoint is unreachable or no compatible ANT model was discovered.
+- Check :code:`params.ip_address` and :code:`params.ip_port` and ensure EDX server is reachable from the client host.
+- :code:`other_info` endpoint format is no longer supported for :code:`ANT_NEURO_EDX_BOARD`.
+- If multiple amplifiers are present, set :code:`params.serial_number` to force deterministic device selection.
 
 For more information about Ant Neuro boards please refer to their User Manual.
 

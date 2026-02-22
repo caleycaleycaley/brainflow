@@ -360,7 +360,7 @@ classdef BoardShim
             obj.input_params_json = input_params.to_json();
             obj.board_id = int32(board_id);
             obj.master_board_id = obj.board_id;
-            if((board_id == int32(BoardIds.STREAMING_BOARD)) ||(board_id == int32(BoardIds.PLAYBACK_FILE_BOARD)))
+            if((board_id == int32(BoardIds.STREAMING_BOARD)) ||(board_id == int32(BoardIds.PLAYBACK_FILE_BOARD)) || (board_id == int32(BoardIds.ANT_NEURO_EDX_BOARD)))
                 if (input_params.master_board == int32(BoardIds.NO_BOARD))
                     error('You need to provide master board id for streaming or playback boards');
                 end
@@ -500,3 +500,4 @@ classdef BoardShim
     end
 
 end
+

@@ -1,9 +1,13 @@
 import argparse
 import logging
 
-import pyqtgraph as pg
-from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
+from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds, BoardControllerDLL
 from brainflow.data_filter import DataFilter, FilterTypes, WindowOperations, DetrendOperations
+
+# Preload BoardController before Qt to avoid Windows DLL init-order conflicts.
+BoardControllerDLL.get_instance()
+
+import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets, QtCore
 
 

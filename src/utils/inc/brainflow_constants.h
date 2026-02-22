@@ -94,16 +94,18 @@ enum class BoardIds : int
     OB3000_24_CHANNELS_BOARD = 63,
     BIOLISTENER_BOARD = 64,
     IRONBCI_32_BOARD = 65,
+    ANT_NEURO_EDX_BOARD = 66,
     // use it to iterate
     FIRST = PLAYBACK_FILE_BOARD,
-    LAST = IRONBCI_32_BOARD
+    LAST = ANT_NEURO_EDX_BOARD
 };
 
 enum class IpProtocolTypes : int
 {
     NO_IP_PROTOCOL = 0,
     UDP = 1,
-    TCP = 2
+    TCP = 2,
+    EDX = 3
 };
 
 enum class FilterTypes : int

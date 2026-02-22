@@ -74,13 +74,15 @@ export enum BoardIds {
     SYNCHRONI_UNO_1_CHANNELS_BOARD = 62,
     OB3000_24_CHANNELS_BOARD = 63,
     BIOLISTENER_BOARD = 64,
-    IRONBCI_32_BOARD = 65
+    IRONBCI_32_BOARD = 65,
+    ANT_NEURO_EDX_BOARD = 66
 }
 
 export enum IpProtocolTypes {
     NO_IP_PROTOCOL = 0,
     UDP = 1,
     TCP = 2,
+    EDX = 3,
 }
 
 export enum BrainFlowPresets {
@@ -267,3 +269,4 @@ export interface IBrainFlowModelParams {
     outputName: string;
     maxArraySize: number;
 }
+
