@@ -164,10 +164,12 @@ export class BoardShim
     constructor(boardId: BoardIds, inputParams: Partial<IBrainFlowInputParams>)
     {
         this.boardId = boardId;
+        const hasMasterBoard =
+            inputParams.masterBoard !== undefined && inputParams.masterBoard !== null;
         if ((boardId === BoardIds.STREAMING_BOARD ||
                 boardId === BoardIds.PLAYBACK_FILE_BOARD ||
                 boardId === BoardIds.ANT_NEURO_EDX_BOARD) &&
-            (!inputParams.masterBoard || inputParams.masterBoard === BoardIds.NO_BOARD))
+            (!hasMasterBoard || inputParams.masterBoard === BoardIds.NO_BOARD))
         {
             throw new BrainFlowError (
                 BrainFlowExitCodes.INVALID_ARGUMENTS_ERROR,
@@ -178,9 +180,9 @@ export class BoardShim
             ((boardId === BoardIds.STREAMING_BOARD ||
                 boardId === BoardIds.PLAYBACK_FILE_BOARD ||
                 boardId === BoardIds.ANT_NEURO_EDX_BOARD) &&
-                inputParams.masterBoard &&
+                hasMasterBoard &&
                 inputParams.masterBoard !== BoardIds.NO_BOARD) ?
-                inputParams.masterBoard :
+                (inputParams.masterBoard as BoardIds) :
                 boardId;
         this.inputJson = new BrainFlowInputParams (inputParams).toJson();
     }
