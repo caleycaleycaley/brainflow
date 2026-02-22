@@ -62,3 +62,29 @@ The BrainFlow project strives to abide by generally accepted best practices in o
 
 ## License: 
 [MIT](https://github.com/brainflow-dev/brainflow/blob/master/LICENSE)
+
+## Rust EDX GUI Realtime Examples
+
+Quick start from `rust_package/brainflow`:
+
+```
+cd rust_package/brainflow
+cargo run --release --example plot_real_time_min
+```
+
+```
+cargo run --release --example plot_real_time
+```
+
+Windows note:
+
+- Ensure EDX-enabled BrainFlow runtime DLLs are resolvable:
+  - `$env:PATH="C:\DEV\brainflow-dev\compiled\Release;C:\DEV\brainflow-dev\rust_package\brainflow\lib;$env:PATH"`
+
+Detailed run guide (defaults, CLI args, more channels, sampling-rate config, troubleshooting):
+
+```
+rust_package/brainflow/examples/README.md
+```
+
+`plot_real_time` also persists GUI view settings (time/y range, filters, sweep toggle, colors) between runs.

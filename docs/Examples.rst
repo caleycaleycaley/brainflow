@@ -539,6 +539,28 @@ Rust ICA
 .. literalinclude:: ../rust_package/brainflow/examples/ica.rs
    :language: rust
 
+Rust Realtime GUI (EDX)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run Rust realtime GUI examples from :code:`rust_package/brainflow`: ::
+
+   cargo run --release --example plot_real_time_min
+   cargo run --release --example plot_real_time
+
+EDX defaults used by these examples:
+
+- :code:`board_id=66` (:code:`ANT_NEURO_EDX_BOARD`)
+- :code:`master_board=51` (:code:`ANT_NEURO_EE_511_BOARD`)
+- :code:`ip_address=localhost`
+- :code:`ip_port=3390`
+- :code:`ip_protocol=EDX` (optional for board 66)
+- :code:`timeout=15`
+
+Detailed Rust GUI run guide (arguments, more channels, sampling-rate configuration and troubleshooting):
+
+- :code:`rust_package/brainflow/examples/README.md`
+- `Repository link <https://github.com/brainflow-dev/brainflow/blob/master/rust_package/brainflow/examples/README.md>`_
+
 Typescript
 ------------
 
