@@ -189,6 +189,34 @@ If your devices uses TCP/IP to send data, you need to run docker container with 
 Compilation of Core Module and C++ Binding
 -------------------------------------------
 
+Conan-first dependency workflow (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use Conan when you want dependency resolution managed for EDX builds. EDX dependencies are
+pulled only when :code:`ant_edx=True`.
+
+.. compound::
+
+    Windows (Visual Studio) example: ::
+
+        # package with default options (no EDX deps)
+        conan create . demo/testing
+
+        # package with EDX enabled (pulls protobuf + grpc)
+        conan create . demo/testing -o ant_edx=True -o static_msvc_runtime=False --build=missing
+
+.. compound::
+
+    Linux (Ubuntu/WSL) example: ::
+
+        # package with default options (no EDX deps)
+        conan create . demo/testing
+
+        # package with EDX enabled (pulls protobuf + grpc)
+        conan create . demo/testing -o ant_edx=True --build=missing
+
+If Conan is not available, use the system-package flow below.
+
 Windows
 ~~~~~~~~
 
@@ -241,9 +269,13 @@ Linux
     EDX profile on Linux example: ::
 
         # install grpc/protobuf development dependencies first
+        # protobuf-compiler-grpc provides grpc_cpp_plugin used by CMake
+        sudo apt-get update
+        sudo apt-get install -y libprotobuf-dev protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+
         mkdir build-edx
         cd build-edx
-        cmake -DBUILD_ANT_EDX=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../installed-edx ..
+        cmake -DBUILD_ANT_EDX=ON -DBUILD_SYNCHRONI_SDK=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../installed-edx ..
         make
         make install
 

@@ -55,6 +55,7 @@ Instructions to add new boards to BrainFlow
 - add information about your board to `brainflow_boards.cpp <https://github.com/brainflow-dev/brainflow/blob/master/src/board_controller/brainflow_boards.cpp>`_
 - add new files to BOARD_CONTROLLER_SRC variable in `build.cmake <https://github.com/brainflow-dev/brainflow/blob/master/src/board_controller/build.cmake>`_, you may also need to add new directory to *target_include_directories*.
 - if your board uses optional external dependencies, add a CMake option (for example :code:`BUILD_ANT_EDX`) to keep default builds dependency-light.
+- if you maintain Conan packaging, gate optional dependencies behind a Conan option (for example :code:`ant_edx`) instead of adding them to default builds.
 - for EDX transport builds on Windows, use :code:`-DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic` and provide gRPC/protobuf via your toolchain (for example vcpkg).
 - for EDX transport builds on Linux, enable :code:`-DBUILD_ANT_EDX=ON` and ensure :code:`protoc`, gRPC and protobuf development packages are available.
 - create a PR
