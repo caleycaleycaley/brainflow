@@ -1298,7 +1298,7 @@ public class BoardShim
         this.board_id = board_id;
         this.master_board_id = board_id;
         if (
-            (board_id == BoardIds.STREAMING_BOARD.get_code ()) || (board_id == BoardIds.PLAYBACK_FILE_BOARD.get_code ())
+            (board_id == BoardIds.STREAMING_BOARD.get_code ()) || (board_id == BoardIds.PLAYBACK_FILE_BOARD.get_code ()) || (board_id == BoardIds.ANT_NEURO_EDX_BOARD.get_code ())
         )
         {
             if (params.get_master_board () == BoardIds.NO_BOARD.get_code ())
@@ -1324,6 +1324,7 @@ public class BoardShim
         if (
             (board_id.get_code () == BoardIds.STREAMING_BOARD.get_code ())
                     || (board_id.get_code () == BoardIds.PLAYBACK_FILE_BOARD.get_code ())
+                    || (board_id.get_code () == BoardIds.ANT_NEURO_EDX_BOARD.get_code ())
         )
         {
             if (params.get_master_board () == BoardIds.NO_BOARD.get_code ())
@@ -1640,3 +1641,4 @@ public class BoardShim
         return get_board_data (num_datapoints, BrainFlowPresets.DEFAULT_PRESET);
     }
 }
+

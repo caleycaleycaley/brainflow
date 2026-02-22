@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Runtime.Serialization.Json;
 using System.Text;
@@ -29,7 +29,7 @@ namespace brainflow
             this.board_id = board_id;
             this.input_params = input_params;
 
-            if ((board_id == (int)BoardIds.STREAMING_BOARD) || (board_id == (int)BoardIds.PLAYBACK_FILE_BOARD))
+            if ((board_id == (int)BoardIds.STREAMING_BOARD) || (board_id == (int)BoardIds.PLAYBACK_FILE_BOARD) || (board_id == (int)BoardIds.ANT_NEURO_EDX_BOARD))
             {
                 if (input_params.master_board != (int)BoardIds.NO_BOARD)
                 {
@@ -987,3 +987,4 @@ namespace brainflow
         }
     }
 }
+
