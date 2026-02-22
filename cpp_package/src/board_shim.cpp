@@ -266,7 +266,8 @@ int BoardShim::get_board_id ()
 {
     int master_board_id = board_id;
     if ((board_id == (int)BoardIds::STREAMING_BOARD) ||
-        (board_id == (int)BoardIds::PLAYBACK_FILE_BOARD))
+        (board_id == (int)BoardIds::PLAYBACK_FILE_BOARD) ||
+        (board_id == (int)BoardIds::ANT_NEURO_EDX_BOARD))
     {
         if (params.master_board == (int)BoardIds::NO_BOARD)
         {

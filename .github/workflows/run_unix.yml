@@ -419,3 +419,37 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  EDXLinux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone Repository
+      uses: actions/checkout@v2
+    - name: Setup Cmake
+      uses: jwlawson/actions-setup-cmake@v1.13
+      with:
+        cmake-version: '3.21.x'
+    - name: Install EDX Build Dependencies
+      run: |
+        sudo -H apt-get update -y
+        sudo -H apt-get install -y build-essential protobuf-compiler libprotobuf-dev libgrpc++-dev grpc-proto
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    - name: Build EDX Profile
+      run: |
+        mkdir $GITHUB_WORKSPACE/build_edx
+        cd $GITHUB_WORKSPACE/build_edx
+        cmake -DBUILD_ANT_EDX=ON -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/installed_edx -DCMAKE_BUILD_TYPE=Release ..
+        make -j2
+        make install
+
+  EDXManyLinux:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - name: Clone Repository
+      uses: actions/checkout@v2
+    - name: Build EDX in ManyLinux (staged)
+      run: |
+        docker pull dockcross/manylinux_2_28-x64:20240418-88c04a4
+        docker run -e GITHUB_WORKSPACE=$GITHUB_WORKSPACE -v $GITHUB_WORKSPACE:$GITHUB_WORKSPACE dockcross/manylinux_2_28-x64:20240418-88c04a4 /bin/bash -c "yum install -y protobuf-devel grpc-devel && cd $GITHUB_WORKSPACE && mkdir build_docker_edx && cd build_docker_edx && cmake -DBUILD_ANT_EDX=ON -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/installed_docker_edx -DCMAKE_BUILD_TYPE=Release .. && make -j2 && make install"
