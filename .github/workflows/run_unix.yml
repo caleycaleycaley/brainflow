@@ -432,7 +432,7 @@ jobs:
     - name: Install EDX Build Dependencies
       run: |
         sudo -H apt-get update -y
-        sudo -H apt-get install -y build-essential protobuf-compiler libprotobuf-dev libgrpc++-dev grpc-proto
+        sudo -H apt-get install -y build-essential protobuf-compiler protobuf-compiler-grpc libprotobuf-dev libgrpc++-dev
       env:
         DEBIAN_FRONTEND: noninteractive
     - name: Build EDX Profile
