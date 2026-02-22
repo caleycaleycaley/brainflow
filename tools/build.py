@@ -206,6 +206,9 @@ def prepare_args():
                         required=False, default=os.path.join(cur_folder, '..', 'installed'))
     parser.add_argument('--use-openmp', action='store_true')
     parser.add_argument('--onnx', action='store_true')
+    parser.add_argument('--ant-edx', dest='ant_edx', action='store_true')
+    parser.add_argument('--no-ant-edx', dest='ant_edx', action='store_false')
+    parser.set_defaults(ant_edx=False)
     
     parser.add_argument('--synchroni', dest='synchroni', action='store_true')
     parser.add_argument('--no-synchroni', dest='synchroni', action='store_false')
@@ -285,6 +288,8 @@ def config(args):
         cmd_config.append('-DBUILD_SYNCHRONI_SDK=ON')
     if hasattr(args, 'onnx') and args.onnx:
         cmd_config.append('-DBUILD_ONNX=ON')
+    if hasattr(args, 'ant_edx') and args.ant_edx:
+        cmd_config.append('-DBUILD_ANT_EDX=ON')
     if hasattr(args, 'tests') and args.tests:
         cmd_config.append('-DBUILD_TESTS=ON')
     cmd_config.append(brainflow_root_folder)

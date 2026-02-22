@@ -84,7 +84,8 @@ BrainFlowBoards::BrainFlowBoards()
             {"63", json::object()},
             {"64", json::object()},
             {"65", json::object()},
-            {"66", json::object()}
+            {"66", json::object()},
+            {"67", json::object()}
         }
     }};
 
@@ -1158,6 +1159,18 @@ BrainFlowBoards::BrainFlowBoards()
         {"num_rows", 22},
         {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
         {"other_channels", {9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}}
+    };
+    brainflow_boards_json["boards"]["67"]["default"] =
+    {
+        {"name", "AntNeuroEDX"},
+        {"sampling_rate", 2000},
+        {"timestamp_channel", 68},
+        {"marker_channel", 69},
+        {"package_num_channel", 0},
+        {"num_rows", 70},
+        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
+        {"resistance_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
+        {"other_channels", {67}}
     };
 }
 
