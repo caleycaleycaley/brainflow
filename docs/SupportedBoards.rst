@@ -1148,6 +1148,65 @@ Available commands:
 
 For more information about Ant Neuro boards please refer to their User Manual.
 
+Ant Neuro EDX
+~~~~~~~~~~~~~~
+
+EDX transport exposes ANT Neuro amplifiers through an external gRPC service.
+
+Use board id:
+
+- :code:`BoardIds.ANT_NEURO_EDX_BOARD`
+
+Required BrainFlowInputParams fields:
+
+- :code:`master_board`, descriptor source board id (for example :code:`BoardIds.ANT_NEURO_EE_511_BOARD`)
+- :code:`ip_address`, EDX service host (for example :code:`localhost`)
+- :code:`ip_port`, EDX service port (for example :code:`3390`)
+
+Optional fields:
+
+- :code:`ip_protocol`, optional; :code:`IpProtocolTypes.EDX` is accepted for clarity
+- :code:`timeout`, timeout for discovery and session operations, default is 15 sec
+
+Important notes:
+
+- Runtime data layout for board 66 is always derived from :code:`master_board`.
+- :code:`other_info` endpoint format (for example :code:`localhost:3390`) is not supported for board 66.
+
+Initialization example (Python):
+
+.. code-block:: python
+
+    params = BrainFlowInputParams()
+    params.master_board = BoardIds.ANT_NEURO_EE_511_BOARD
+    params.ip_address = "localhost"
+    params.ip_port = 3390
+    params.ip_protocol = IpProtocolTypes.EDX
+    board = BoardShim(BoardIds.ANT_NEURO_EDX_BOARD, params)
+
+Initialization example (C++):
+
+.. code-block:: cpp
+
+    BrainFlowInputParams params;
+    params.master_board = (int)BoardIds::ANT_NEURO_EE_511_BOARD;
+    params.ip_address = "localhost";
+    params.ip_port = 3390;
+    params.ip_protocol = (int)IpProtocolTypes::EDX;
+    BoardShim board ((int)BoardIds::ANT_NEURO_EDX_BOARD, params);
+
+Initialization example (Rust):
+
+.. code-block:: rust
+
+    let params = BrainFlowInputParamsBuilder::default()
+        .master_board(BoardIds::AntNeuroEe511Board)
+        .ip_address("localhost")
+        .ip_port(3390)
+        .ip_protocol(IpProtocolTypes::Edx)
+        .build();
+    let board = BoardShim::new(BoardIds::AntNeuroEdxBoard, params)?;
+
 Enophone
 ---------
 
