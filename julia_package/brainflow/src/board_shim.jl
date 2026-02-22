@@ -68,6 +68,7 @@ export BrainFlowInputParams
     BIOLISTENER_BOARD = 64
     IRONBCI_32_BOARD = 65
     NEUROPAWN_KNIGHT_BOARD_IMU = 66
+    ANT_NEURO_EDX_BOARD = 67
 
 end
 
@@ -78,6 +79,7 @@ BoardIdType = Union{BoardIds, Integer}
     NO_IP_PROTOCOL = 0
     UDP = 1
     TCP = 2
+    EDX = 3
 
 end
 
@@ -229,7 +231,7 @@ struct BoardShim
 
     function BoardShim(id::Integer, params::BrainFlowInputParams)
         master_id = id
-        if id == Integer(STREAMING_BOARD) || id == Integer(PLAYBACK_FILE_BOARD)
+        if id == Integer(STREAMING_BOARD) || id == Integer(PLAYBACK_FILE_BOARD) || id == Integer(ANT_NEURO_EDX_BOARD)
             master_id = Integer(params.master_board)
         end
         new(master_id, id, JSON.json(params))
@@ -336,3 +338,4 @@ end
     value = transpose(reshape(val[1:data_size[1] * num_rows], (data_size[1], num_rows)))
     return value
 end
+

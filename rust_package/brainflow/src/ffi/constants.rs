@@ -32,7 +32,7 @@ impl BoardIds {
     pub const FIRST: BoardIds = BoardIds::PlaybackFileBoard;
 }
 impl BoardIds {
-    pub const LAST: BoardIds = BoardIds::NeuropawnKnightBoardImu;
+    pub const LAST: BoardIds = BoardIds::AntNeuroEdxBoard;
 }
 #[repr(i32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -102,6 +102,7 @@ pub enum BoardIds {
     BiolistenerBoard = 64,
     Ironbci32Board = 65,
     NeuropawnKnightBoardImu = 66,
+    AntNeuroEdxBoard = 67,
 }
 #[repr(i32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -109,6 +110,7 @@ pub enum IpProtocolTypes {
     NoIpProtocol = 0,
     Udp = 1,
     Tcp = 2,
+    Edx = 3,
 }
 #[repr(i32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -260,3 +262,5 @@ pub enum WaveletTypes {
     Sym9 = 43,
     Sym10 = 44,
 }
+
+

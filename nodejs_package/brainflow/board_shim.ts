@@ -165,9 +165,13 @@ export class BoardShim
     {
         this.boardId = boardId;
         this.masterBoardId =
-            inputParams.masterBoard && inputParams.masterBoard !== BoardIds.NO_BOARD ?
-            inputParams.masterBoard :
-            boardId;
+            ((boardId === BoardIds.STREAMING_BOARD ||
+                boardId === BoardIds.PLAYBACK_FILE_BOARD ||
+                boardId === BoardIds.ANT_NEURO_EDX_BOARD) &&
+                inputParams.masterBoard &&
+                inputParams.masterBoard !== BoardIds.NO_BOARD) ?
+                inputParams.masterBoard :
+                boardId;
         this.inputJson = new BrainFlowInputParams (inputParams).toJson();
     }
 

@@ -81,6 +81,7 @@ class BoardIds(enum.IntEnum):
     BIOLISTENER_BOARD = 64  #:
     IRONBCI_32_BOARD = 65  #:
     NEUROPAWN_KNIGHT_BOARD_IMU = 66  #:
+    ANT_NEURO_EDX_BOARD = 67  #:
 
 
 class IpProtocolTypes(enum.IntEnum):
@@ -89,6 +90,7 @@ class IpProtocolTypes(enum.IntEnum):
     NO_IP_PROTOCOL = 0  #:
     UDP = 1  #:
     TCP = 2  #:
+    EDX = 3  #:
 
 
 class BrainFlowPresets(enum.IntEnum):
@@ -582,7 +584,7 @@ class BoardShim(object):
             self.input_json = input_params.to_json()
         self.board_id = board_id
         # we need it for streaming board
-        if board_id == BoardIds.STREAMING_BOARD.value or board_id == BoardIds.PLAYBACK_FILE_BOARD.value:
+        if board_id == BoardIds.STREAMING_BOARD.value or board_id == BoardIds.PLAYBACK_FILE_BOARD.value or board_id == BoardIds.ANT_NEURO_EDX_BOARD.value:
             if input_params.master_board != BoardIds.NO_BOARD:
                 self._master_board_id = input_params.master_board
             else:
@@ -1420,3 +1422,5 @@ class BoardShim(object):
         res = BoardControllerDLL.get_instance().config_board_with_bytes(bytes_to_send, len(bytes_to_send), self.board_id, self.input_json)
         if res != BrainFlowExitCodes.STATUS_OK.value:
             raise BrainFlowError('unable to config board', res)
+
+

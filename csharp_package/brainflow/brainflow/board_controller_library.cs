@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 
 namespace brainflow
@@ -18,7 +18,8 @@ namespace brainflow
     {
         NO_IP_PROTOCOL = 0,
         UDP = 1,
-        TCP = 2
+        TCP = 2,
+        EDX = 3
     };
 
     public enum BrainFlowPresets
@@ -122,7 +123,8 @@ namespace brainflow
         OB3000_24_CHANNELS_BOARD = 63,
         BIOLISTENER_BOARD = 64,
         IRONBCI_32_BOARD = 65,
-        NEUROPAWN_KNIGHT_BOARD_IMU = 66
+        NEUROPAWN_KNIGHT_BOARD_IMU = 66,
+        ANT_NEURO_EDX_BOARD = 67
     };
 
 
@@ -874,3 +876,4 @@ namespace brainflow
         }
     }
 }
+
