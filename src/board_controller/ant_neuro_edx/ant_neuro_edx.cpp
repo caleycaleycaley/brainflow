@@ -3,8 +3,8 @@
 #ifdef BUILD_ANT_EDX
 
 #include <algorithm>
-#include <chrono>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <regex>
 #include <set>
@@ -17,127 +17,137 @@ using json = nlohmann::json;
 
 namespace
 {
-constexpr int edx_board_id = (int)BoardIds::ANT_NEURO_EDX_BOARD;
+    constexpr int edx_board_id = (int)BoardIds::ANT_NEURO_EDX_BOARD;
 
-bool is_ant_master_board (int board_id)
-{
-    return ((board_id >= (int)BoardIds::ANT_NEURO_EE_410_BOARD &&
-               board_id <= (int)BoardIds::ANT_NEURO_EE_225_BOARD) ||
-        (board_id == (int)BoardIds::ANT_NEURO_EE_511_BOARD));
-}
-
-std::string to_upper (std::string s)
-{
-    std::transform (s.begin (), s.end (), s.begin (),
-        [] (unsigned char c) { return (char)std::toupper (c); });
-    return s;
-}
-
-std::vector<std::string> expected_tokens (int master_board)
-{
-    switch ((BoardIds)master_board)
+    bool is_ant_master_board (int board_id)
     {
-        case BoardIds::ANT_NEURO_EE_511_BOARD:
-            return {"EE-511", "EE-5XX"};
-        case BoardIds::ANT_NEURO_EE_410_BOARD:
-        case BoardIds::ANT_NEURO_EE_411_BOARD:
-        case BoardIds::ANT_NEURO_EE_430_BOARD:
-            return {"EE-4XX"};
-        default:
-            return {"EE-2XX"};
+        return ((board_id >= (int)BoardIds::ANT_NEURO_EE_410_BOARD &&
+                    board_id <= (int)BoardIds::ANT_NEURO_EE_225_BOARD) ||
+            (board_id == (int)BoardIds::ANT_NEURO_EE_511_BOARD));
     }
-}
 
-std::set<std::string> extract_tokens (const std::string &value)
-{
-    std::set<std::string> result;
-    std::regex re ("EE[\\-_ ]?([245][0-9X]{2})");
-    std::string upper = to_upper (value);
-    auto begin = std::sregex_iterator (upper.begin (), upper.end (), re);
-    auto end = std::sregex_iterator ();
-    for (auto it = begin; it != end; ++it)
+    std::string to_upper (std::string s)
     {
-        std::string suffix = (*it)[1].str ();
-        std::string token = "EE-" + suffix;
-        result.insert (token);
-        if (suffix.size () == 3 && std::isdigit ((unsigned char)suffix[0]))
+        std::transform (s.begin (), s.end (), s.begin (),
+            [] (unsigned char c) { return (char)std::toupper (c); });
+        return s;
+    }
+
+    std::vector<std::string> expected_tokens (int master_board)
+    {
+        switch ((BoardIds)master_board)
         {
-            result.insert (std::string ("EE-") + suffix[0] + "XX");
+            case BoardIds::ANT_NEURO_EE_511_BOARD:
+                return {"EE-511", "EE-5XX"};
+            case BoardIds::ANT_NEURO_EE_410_BOARD:
+            case BoardIds::ANT_NEURO_EE_411_BOARD:
+            case BoardIds::ANT_NEURO_EE_430_BOARD:
+                return {"EE-4XX"};
+            default:
+                return {"EE-2XX"};
         }
     }
-    return result;
-}
 
-bool has_match (const std::set<std::string> &tokens, const std::vector<std::string> &need)
-{
-    for (const auto &token : need)
+    std::set<std::string> extract_tokens (const std::string &value)
     {
-        if (tokens.find (token) != tokens.end ())
+        std::set<std::string> result;
+        std::regex re ("EE[\\-_ ]?([245][0-9X]{2})");
+        std::string upper = to_upper (value);
+        auto begin = std::sregex_iterator (upper.begin (), upper.end (), re);
+        auto end = std::sregex_iterator ();
+        for (auto it = begin; it != end; ++it)
         {
-            return true;
+            std::string suffix = (*it)[1].str ();
+            std::string token = "EE-" + suffix;
+            result.insert (token);
+            if (suffix.size () == 3 && std::isdigit ((unsigned char)suffix[0]))
+            {
+                result.insert (std::string ("EE-") + suffix[0] + "XX");
+            }
+        }
+        return result;
+    }
+
+    bool has_match (const std::set<std::string> &tokens, const std::vector<std::string> &need)
+    {
+        for (const auto &token : need)
+        {
+            if (tokens.find (token) != tokens.end ())
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool is_reference_or_ground_channel_name (const std::string &name)
+    {
+        std::string upper = to_upper (name);
+        return (upper.find ("REF") != std::string::npos) ||
+            (upper.find ("GND") != std::string::npos) ||
+            (upper.find ("GROUND") != std::string::npos) ||
+            (upper.find ("CMS") != std::string::npos);
+    }
+
+    double ts_to_unix (const google::protobuf::Timestamp &ts)
+    {
+        return (double)ts.seconds () + ((double)ts.nanos () / 1000000000.0);
+    }
+
+    int map_status (const grpc::Status &status)
+    {
+        if (status.ok ())
+        {
+            return (int)BrainFlowExitCodes::STATUS_OK;
+        }
+        if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
+        {
+            return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+        }
+        if (status.error_code () == grpc::StatusCode::INVALID_ARGUMENT)
+        {
+            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+        }
+        return (int)BrainFlowExitCodes::GENERAL_ERROR;
+    }
+
+    int handshake_status_to_brainflow (const grpc::Status &status)
+    {
+        if (status.ok ())
+        {
+            return (int)BrainFlowExitCodes::STATUS_OK;
+        }
+
+        if (status.error_code () == grpc::StatusCode::UNIMPLEMENTED)
+        {
+            return (int)BrainFlowExitCodes::UNSUPPORTED_BOARD_ERROR;
+        }
+        if (status.error_code () == grpc::StatusCode::UNAVAILABLE)
+        {
+            return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
+        }
+        if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
+        {
+            return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+        }
+        return map_status (status);
+    }
+
+    std::vector<int> try_get_vec (const json &obj, const char *key)
+    {
+        try
+        {
+            return obj[key].get<std::vector<int>> ();
+        }
+        catch (...)
+        {
+            return {};
         }
     }
-    return false;
-}
-
-double ts_to_unix (const google::protobuf::Timestamp &ts)
-{
-    return (double)ts.seconds () + ((double)ts.nanos () / 1000000000.0);
-}
-
-int map_status (const grpc::Status &status)
-{
-    if (status.ok ())
-    {
-        return (int)BrainFlowExitCodes::STATUS_OK;
-    }
-    if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
-    {
-        return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
-    }
-    if (status.error_code () == grpc::StatusCode::INVALID_ARGUMENT)
-    {
-        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
-    }
-    return (int)BrainFlowExitCodes::GENERAL_ERROR;
-}
-
-int handshake_status_to_brainflow (const grpc::Status &status)
-{
-    if (status.ok ())
-    {
-        return (int)BrainFlowExitCodes::STATUS_OK;
-    }
-
-    if (status.error_code () == grpc::StatusCode::UNIMPLEMENTED)
-    {
-        return (int)BrainFlowExitCodes::UNSUPPORTED_BOARD_ERROR;
-    }
-    if (status.error_code () == grpc::StatusCode::UNAVAILABLE)
-    {
-        return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
-    }
-    if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
-    {
-        return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
-    }
-    return map_status (status);
-}
-
-std::vector<int> try_get_vec (const json &obj, const char *key)
-{
-    try
-    {
-        return obj[key].get<std::vector<int>> ();
-    }
-    catch (...)
-    {
-        return {};
-    }
-}
 } // namespace
 
-AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params) : Board (edx_board_id, params)
+AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params)
+    : Board (edx_board_id, params)
 {
     keep_alive = false;
     initialized = false;
@@ -168,7 +178,8 @@ int AntNeuroEdxBoard::validate_master_board ()
 {
     if (!is_ant_master_board (requested_master_board))
     {
-        safe_logger (spdlog::level::err, "invalid master_board for EDX: {}", requested_master_board);
+        safe_logger (
+            spdlog::level::err, "invalid master_board for EDX: {}", requested_master_board);
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
     return (int)BrainFlowExitCodes::STATUS_OK;
@@ -179,7 +190,8 @@ int AntNeuroEdxBoard::ensure_connected ()
     if (!params.other_info.empty () && params.ip_address.empty () && (params.ip_port <= 0))
     {
         safe_logger (spdlog::level::err,
-            "EDX endpoint in other_info is no longer supported for board 66, use ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported for board 66, use "
+            "ip_address/ip_port");
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
@@ -191,22 +203,23 @@ int AntNeuroEdxBoard::ensure_connected ()
 
     if ((params.ip_port <= 0) || (params.ip_port > 65535))
     {
-        safe_logger (spdlog::level::err, "EDX requires valid ip_port (1..65535), got {}", params.ip_port);
+        safe_logger (
+            spdlog::level::err, "EDX requires valid ip_port (1..65535), got {}", params.ip_port);
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
     if (!params.other_info.empty ())
     {
         safe_logger (spdlog::level::warn,
-            "EDX endpoint in other_info is no longer supported for board 66, use ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported for board 66, use "
+            "ip_address/ip_port");
     }
 
     if ((params.ip_address.find ("://") != std::string::npos) ||
         (params.ip_address.find ("/") != std::string::npos))
     {
         safe_logger (spdlog::level::err,
-            "EDX requires host-only ip_address, got URI-like value '{}'",
-            params.ip_address);
+            "EDX requires host-only ip_address, got URI-like value '{}'", params.ip_address);
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
@@ -214,7 +227,8 @@ int AntNeuroEdxBoard::ensure_connected ()
 
     grpc_channel = grpc::CreateChannel (endpoint, grpc::InsecureChannelCredentials ());
     stub = EdigRPC::gen::EdigRPC::NewStub (grpc_channel);
-    return stub ? (int)BrainFlowExitCodes::STATUS_OK : (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
+    return stub ? (int)BrainFlowExitCodes::STATUS_OK :
+                  (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
 }
 
 int AntNeuroEdxBoard::connect_and_create_device ()
@@ -291,9 +305,10 @@ int AntNeuroEdxBoard::load_capabilities ()
     channels_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetChannelsAvailableResponse channels_resp;
     grpc::ClientContext channels_ctx;
-    channels_ctx.set_deadline (std::chrono::system_clock::now () +
-        std::chrono::seconds (std::max (1, params.timeout)));
-    grpc::Status status = stub->Amplifier_GetChannelsAvailable (&channels_ctx, channels_req, &channels_resp);
+    channels_ctx.set_deadline (
+        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
+    grpc::Status status =
+        stub->Amplifier_GetChannelsAvailable (&channels_ctx, channels_req, &channels_resp);
     if (!status.ok ())
     {
         return map_status (status);
@@ -326,8 +341,8 @@ int AntNeuroEdxBoard::load_capabilities ()
     rates_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetSamplingRatesAvailableResponse rates_resp;
     grpc::ClientContext rates_ctx;
-    rates_ctx.set_deadline (std::chrono::system_clock::now () +
-        std::chrono::seconds (std::max (1, params.timeout)));
+    rates_ctx.set_deadline (
+        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
     status = stub->Amplifier_GetSamplingRatesAvailable (&rates_ctx, rates_req, &rates_resp);
     if (!status.ok ())
     {
@@ -347,8 +362,8 @@ int AntNeuroEdxBoard::load_capabilities ()
     ranges_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetRangesAvailableResponse ranges_resp;
     grpc::ClientContext ranges_ctx;
-    ranges_ctx.set_deadline (std::chrono::system_clock::now () +
-        std::chrono::seconds (std::max (1, params.timeout)));
+    ranges_ctx.set_deadline (
+        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
     status = stub->Amplifier_GetRangesAvailable (&ranges_ctx, ranges_req, &ranges_resp);
     if (!status.ok ())
     {
@@ -360,11 +375,13 @@ int AntNeuroEdxBoard::load_capabilities ()
     {
         if (entry.first == (int)EdigRPC::gen::ChannelPolarity::Referential)
         {
-            reference_ranges_available.assign (entry.second.values ().begin (), entry.second.values ().end ());
+            reference_ranges_available.assign (
+                entry.second.values ().begin (), entry.second.values ().end ());
         }
         else if (entry.first == (int)EdigRPC::gen::ChannelPolarity::Bipolar)
         {
-            bipolar_ranges_available.assign (entry.second.values ().begin (), entry.second.values ().end ());
+            bipolar_ranges_available.assign (
+                entry.second.values ().begin (), entry.second.values ().end ());
         }
     }
 
@@ -372,8 +389,8 @@ int AntNeuroEdxBoard::load_capabilities ()
     modes_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetModesAvailableResponse modes_resp;
     grpc::ClientContext modes_ctx;
-    modes_ctx.set_deadline (std::chrono::system_clock::now () +
-        std::chrono::seconds (std::max (1, params.timeout)));
+    modes_ctx.set_deadline (
+        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
     status = stub->Amplifier_GetModesAvailable (&modes_ctx, modes_req, &modes_resp);
     if (!status.ok ())
     {
@@ -393,13 +410,60 @@ int AntNeuroEdxBoard::load_capabilities ()
     {
         bipolar_range = bipolar_ranges_available.front ();
     }
-    if (selected_model == "EE-511" || to_upper (selected_device_serial).find ("EE511") != std::string::npos)
+    if (selected_model == "EE-511" ||
+        to_upper (selected_device_serial).find ("EE511") != std::string::npos)
     {
         reference_range = 1.0;
         bipolar_range = 2.5;
     }
 
+    rebuild_impedance_channel_rows ();
+
     return (int)BrainFlowExitCodes::STATUS_OK;
+}
+
+void AntNeuroEdxBoard::rebuild_impedance_channel_rows ()
+{
+    impedance_channel_rows.clear ();
+
+    std::vector<int> eeg_channels = try_get_vec (board_descr["default"], "eeg_channels");
+    std::vector<int> emg_channels = try_get_vec (board_descr["default"], "emg_channels");
+    std::vector<int> resistance_channels =
+        try_get_vec (board_descr["default"], "resistance_channels");
+
+    std::set<int> assigned_rows (eeg_channels.begin (), eeg_channels.end ());
+    assigned_rows.insert (emg_channels.begin (), emg_channels.end ());
+
+    std::vector<int> extra_resistance_rows;
+    for (int row : resistance_channels)
+    {
+        if (assigned_rows.find (row) == assigned_rows.end ())
+        {
+            extra_resistance_rows.push_back (row);
+        }
+    }
+
+    int eeg_idx = 0;
+    int emg_idx = 0;
+    int extra_idx = 0;
+    for (const auto &meta : channel_meta)
+    {
+        if ((meta.polarity == EdigRPC::gen::ChannelPolarity::Referential) &&
+            (eeg_idx < (int)eeg_channels.size ()))
+        {
+            impedance_channel_rows.push_back (eeg_channels[(size_t)eeg_idx++]);
+        }
+        else if ((meta.polarity == EdigRPC::gen::ChannelPolarity::Bipolar) &&
+            (emg_idx < (int)emg_channels.size ()))
+        {
+            impedance_channel_rows.push_back (emg_channels[(size_t)emg_idx++]);
+        }
+        else if (is_reference_or_ground_channel_name (meta.name) &&
+            (extra_idx < (int)extra_resistance_rows.size ()))
+        {
+            impedance_channel_rows.push_back (extra_resistance_rows[(size_t)extra_idx++]);
+        }
+    }
 }
 
 int AntNeuroEdxBoard::prepare_session ()
@@ -501,9 +565,8 @@ int AntNeuroEdxBoard::set_mode ()
 {
     EdigRPC::gen::Amplifier_SetModeRequest request;
     request.set_amplifierhandle (amplifier_handle);
-    request.set_mode (
-        impedance_mode ? EdigRPC::gen::AmplifierMode::AmplifierMode_Impedance :
-                         EdigRPC::gen::AmplifierMode::AmplifierMode_Eeg);
+    request.set_mode (impedance_mode ? EdigRPC::gen::AmplifierMode::AmplifierMode_Impedance :
+                                       EdigRPC::gen::AmplifierMode::AmplifierMode_Eeg);
     configure_stream_params (&request);
 
     EdigRPC::gen::Amplifier_SetModeResponse response;
@@ -595,7 +658,8 @@ int AntNeuroEdxBoard::process_frames ()
     int marker_channel = board_descr["default"]["marker_channel"];
     std::vector<int> eeg_channels = try_get_vec (board_descr["default"], "eeg_channels");
     std::vector<int> emg_channels = try_get_vec (board_descr["default"], "emg_channels");
-    std::vector<int> resistance_channels = try_get_vec (board_descr["default"], "resistance_channels");
+    std::vector<int> resistance_channels =
+        try_get_vec (board_descr["default"], "resistance_channels");
     std::vector<int> other_channels = try_get_vec (board_descr["default"], "other_channels");
     std::vector<double> package ((size_t)num_rows, 0.0);
     const double sample_dt = (sampling_rate > 0) ? (1.0 / (double)sampling_rate) : 0.0;
@@ -610,19 +674,22 @@ int AntNeuroEdxBoard::process_frames ()
             missing_start_frame_count++;
         }
 
-        bool impedance_frame =
-            impedance_mode || frame.frametype () == EdigRPC::gen::AmplifierFrameType::AmplifierFrameType_ImpedanceVoltages;
+        bool impedance_frame = impedance_mode ||
+            frame.frametype () ==
+                EdigRPC::gen::AmplifierFrameType::AmplifierFrameType_ImpedanceVoltages;
         if (impedance_frame)
         {
             std::fill (package.begin (), package.end (), 0.0);
+            const std::vector<int> &impedance_rows =
+                impedance_channel_rows.empty () ? resistance_channels : impedance_channel_rows;
             int idx = 0;
             for (const auto &entry : frame.impedance ().channels ())
             {
-                if (idx >= (int)resistance_channels.size ())
+                if (idx >= (int)impedance_rows.size ())
                 {
                     break;
                 }
-                package[(size_t)resistance_channels[(size_t)idx++]] = (double)entry.value ();
+                package[(size_t)impedance_rows[(size_t)idx++]] = (double)entry.value ();
             }
             package[(size_t)package_num_channel] = (double)package_num++;
             package[(size_t)timestamp_channel] = frame_base_ts;
@@ -636,7 +703,8 @@ int AntNeuroEdxBoard::process_frames ()
                 {
                     non_monotonic_timestamp_count++;
                 }
-                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) > large_gap_threshold)
+                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) >
+                    large_gap_threshold)
                 {
                     large_gap_count++;
                 }
@@ -662,8 +730,8 @@ int AntNeuroEdxBoard::process_frames ()
             {
                 double value = frame.matrix ().data (row * cols + col);
                 int channel_index = (col < (int)active_channel_indices.size ()) ?
-                        active_channel_indices[(size_t)col] :
-                        col;
+                    active_channel_indices[(size_t)col] :
+                    col;
 
                 EdigRPC::gen::ChannelPolarity polarity = EdigRPC::gen::ChannelPolarity::Referential;
                 for (const auto &meta : channel_meta)
@@ -702,7 +770,8 @@ int AntNeuroEdxBoard::process_frames ()
                 {
                     non_monotonic_timestamp_count++;
                 }
-                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) > large_gap_threshold)
+                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) >
+                    large_gap_threshold)
                 {
                     large_gap_count++;
                 }
@@ -849,8 +918,8 @@ int AntNeuroEdxBoard::validate_reference_range (double value)
     {
         return (int)BrainFlowExitCodes::STATUS_OK;
     }
-    return (std::find (reference_ranges_available.begin (), reference_ranges_available.end (), value) !=
-               reference_ranges_available.end ()) ?
+    return (std::find (reference_ranges_available.begin (), reference_ranges_available.end (),
+                value) != reference_ranges_available.end ()) ?
         (int)BrainFlowExitCodes::STATUS_OK :
         (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
 }
@@ -998,8 +1067,7 @@ int AntNeuroEdxBoard::config_board (std::string config, std::string &response)
         info["selected_model"] = selected_model;
         info["selected_key"] = selected_device_key;
         info["selected_serial"] = selected_device_serial;
-        info["timing"] = {
-            {"missing_start_frame_count", missing_start_frame_count},
+        info["timing"] = {{"missing_start_frame_count", missing_start_frame_count},
             {"fallback_timestamp_count", fallback_timestamp_count},
             {"non_monotonic_timestamp_count", non_monotonic_timestamp_count},
             {"large_gap_count", large_gap_count},
