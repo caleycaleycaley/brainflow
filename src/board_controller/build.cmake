@@ -91,7 +91,12 @@ SET (BOARD_CONTROLLER_SRC
 )
 
 if (BUILD_ANT_EDX)
-    find_package (Protobuf CONFIG REQUIRED)
+    # Prefer package-config mode (vcpkg/Conan), but fall back to CMake's
+    # built-in FindProtobuf module for distro system packages.
+    find_package (Protobuf CONFIG QUIET)
+    if (NOT Protobuf_FOUND)
+        find_package (Protobuf REQUIRED)
+    endif ()
     find_package (gRPC CONFIG REQUIRED)
 
     set (ANT_EDX_PROTO_FILE ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ant_neuro_edx/proto/EdigRPC.proto)
