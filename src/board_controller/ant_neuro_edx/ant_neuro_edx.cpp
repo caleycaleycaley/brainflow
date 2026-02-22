@@ -102,6 +102,28 @@ int map_status (const grpc::Status &status)
     return (int)BrainFlowExitCodes::GENERAL_ERROR;
 }
 
+int handshake_status_to_brainflow (const grpc::Status &status)
+{
+    if (status.ok ())
+    {
+        return (int)BrainFlowExitCodes::STATUS_OK;
+    }
+
+    if (status.error_code () == grpc::StatusCode::UNIMPLEMENTED)
+    {
+        return (int)BrainFlowExitCodes::UNSUPPORTED_BOARD_ERROR;
+    }
+    if (status.error_code () == grpc::StatusCode::UNAVAILABLE)
+    {
+        return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
+    }
+    if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
+    {
+        return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+    }
+    return map_status (status);
+}
+
 std::vector<int> try_get_vec (const json &obj, const char *key)
 {
     try
@@ -396,6 +418,30 @@ int AntNeuroEdxBoard::prepare_session ()
     if (res != (int)BrainFlowExitCodes::STATUS_OK)
     {
         return res;
+    }
+
+    // Fail fast on incompatible gRPC service contract before device/session flow.
+    {
+        EdigRPC::gen::GetStateRequest state_req;
+        EdigRPC::gen::GetStateResponse state_resp;
+        grpc::ClientContext state_ctx;
+        state_ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status state_status = stub->GetState (&state_ctx, state_req, &state_resp);
+        if (!state_status.ok ())
+        {
+            safe_logger (spdlog::level::err,
+                "EDX handshake failed: GetState RPC not usable (grpc_code={}, message='{}'). "
+                "Likely client/server proto contract mismatch or endpoint misconfiguration.",
+                (int)state_status.error_code (), state_status.error_message ());
+            return handshake_status_to_brainflow (state_status);
+        }
+        if (state_resp.id ().empty ())
+        {
+            safe_logger (spdlog::level::err,
+                "EDX handshake failed: GetState returned empty Id, refusing to continue.");
+            return (int)BrainFlowExitCodes::UNSUPPORTED_BOARD_ERROR;
+        }
     }
 
     try
