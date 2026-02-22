@@ -44,6 +44,7 @@ private:
     double bipolar_range;
     bool impedance_mode;
     std::vector<int> active_channel_indices;
+    std::vector<int> impedance_channel_rows;
     std::string endpoint;
     int trigger_channel_index;
     // Timing diagnostics are exposed via get_info and do not alter stream shape.
@@ -76,6 +77,7 @@ private:
 #ifdef BUILD_ANT_EDX
     int connect_and_create_device ();
     int load_capabilities ();
+    void rebuild_impedance_channel_rows ();
     int set_idle_mode ();
     int validate_sampling_rate (int value);
     int validate_reference_range (double value);
