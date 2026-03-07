@@ -134,6 +134,7 @@ AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params) : Board 
     non_monotonic_timestamp_count = 0;
     large_gap_count = 0;
     last_emitted_timestamp = -1.0;
+    impedance_sample_count = 0;
 }
 
 AntNeuroEdxBoard::~AntNeuroEdxBoard ()
@@ -487,11 +488,90 @@ int AntNeuroEdxBoard::set_idle_mode ()
     return map_status (status);
 }
 
+int AntNeuroEdxBoard::apply_mode_change ()
+{
+    if (!initialized)
+    {
+        return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
+    }
+
+    bool was_streaming = is_streaming || keep_alive;
+    if (was_streaming)
+    {
+        safe_logger (spdlog::level::info, "EDX apply_mode_change: stopping current stream (impedance_mode={})",
+            impedance_mode ? 1 : 0);
+        keep_alive = false;
+        is_streaming = false;
+        if (streaming_thread.joinable ())
+        {
+            streaming_thread.join ();
+        }
+    }
+
+    safe_logger (spdlog::level::info, "EDX apply_mode_change: calling set_mode (impedance_mode={})",
+        impedance_mode ? 1 : 0);
+    int res = set_mode ();
+    if (res != (int)BrainFlowExitCodes::STATUS_OK)
+    {
+        safe_logger (spdlog::level::err, "EDX apply_mode_change: set_mode failed with {}", res);
+        return res;
+    }
+
+    if (!was_streaming)
+    {
+        safe_logger (spdlog::level::info, "EDX apply_mode_change: was not streaming, done");
+        return (int)BrainFlowExitCodes::STATUS_OK;
+    }
+
+    last_emitted_timestamp = -1.0;
+    non_monotonic_timestamp_count = 0;
+    large_gap_count = 0;
+    fallback_timestamp_count = 0;
+    missing_start_frame_count = 0;
+    impedance_sample_count = 0;
+    keep_alive = true;
+    state = (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+    streaming_thread = std::thread ([this] { read_thread (); });
+
+    // Impedance mode needs longer to produce first frame (amplifier settling)
+    int wait_secs = std::max (1, params.timeout);
+    if (impedance_mode && wait_secs < 30)
+    {
+        wait_secs = 30;
+    }
+    safe_logger (spdlog::level::info, "EDX apply_mode_change: waiting up to {}s for first frame", wait_secs);
+    std::unique_lock<std::mutex> lk (wait_mutex);
+    if (wait_cv.wait_for (
+            lk, std::chrono::seconds (wait_secs),
+            [this] { return state != (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR; }))
+    {
+        if (state == (int)BrainFlowExitCodes::STATUS_OK)
+        {
+            is_streaming = true;
+            safe_logger (spdlog::level::info, "EDX apply_mode_change: streaming started");
+        }
+        return state;
+    }
+
+    safe_logger (spdlog::level::err, "EDX apply_mode_change: timed out after {}s waiting for first frame", wait_secs);
+    keep_alive = false;
+    if (streaming_thread.joinable ())
+    {
+        streaming_thread.join ();
+    }
+    return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+}
+
 void AntNeuroEdxBoard::read_thread ()
 {
-    int sleep_time_ms = 5;
+    int sleep_time_ms = impedance_mode ? 100 : 5;
     int wait_attempts = 0;
-    int max_wait_attempts = std::max (1, params.timeout) * 1000 / sleep_time_ms;
+    int wait_secs = std::max (1, params.timeout);
+    if (impedance_mode && wait_secs < 30)
+    {
+        wait_secs = 30;
+    }
+    int max_wait_attempts = wait_secs * 1000 / sleep_time_ms;
 
     while (keep_alive)
     {
@@ -532,7 +612,10 @@ int AntNeuroEdxBoard::process_frames ()
     EdigRPC::gen::Amplifier_GetFrameResponse response;
 
     grpc::ClientContext ctx;
-    ctx.set_deadline (std::chrono::system_clock::now () + std::chrono::milliseconds (500));
+    // Impedance frames arrive less frequently; use longer deadline to avoid
+    // premature DEADLINE_EXCEEDED that masks valid settling-time delays.
+    int deadline_ms = impedance_mode ? 3000 : 500;
+    ctx.set_deadline (std::chrono::system_clock::now () + std::chrono::milliseconds (deadline_ms));
     grpc::Status status = stub->Amplifier_GetFrame (&ctx, request, &response);
     if (!status.ok ())
     {
@@ -559,6 +642,7 @@ int AntNeuroEdxBoard::process_frames ()
     {
         const bool has_start = frame.has_start ();
         const double frame_base_ts = has_start ? ts_to_unix (frame.start ()) : get_timestamp ();
+        const int frame_marker_count = frame.timemarkers_size ();
         if (!has_start)
         {
             missing_start_frame_count++;
@@ -571,6 +655,22 @@ int AntNeuroEdxBoard::process_frames ()
             std::fill (package.begin (), package.end (), 0.0);
             int idx = 0;
             for (const auto &entry : frame.impedance ().channels ())
+            {
+                if (idx >= (int)resistance_channels.size ())
+                {
+                    break;
+                }
+                package[(size_t)resistance_channels[(size_t)idx++]] = (double)entry.value ();
+            }
+            for (const auto &entry : frame.impedance ().reference ())
+            {
+                if (idx >= (int)resistance_channels.size ())
+                {
+                    break;
+                }
+                package[(size_t)resistance_channels[(size_t)idx++]] = (double)entry.value ();
+            }
+            for (const auto &entry : frame.impedance ().ground ())
             {
                 if (idx >= (int)resistance_channels.size ())
                 {
@@ -596,6 +696,7 @@ int AntNeuroEdxBoard::process_frames ()
                 }
             }
             last_emitted_timestamp = package[(size_t)timestamp_channel];
+            impedance_sample_count++;
             push_package (package.data ());
             continue;
         }
@@ -662,9 +763,19 @@ int AntNeuroEdxBoard::process_frames ()
                 }
             }
             last_emitted_timestamp = package[(size_t)timestamp_channel];
-            if (frame.timemarkers_size () > 0)
+            if (row < frame_marker_count)
             {
-                package[(size_t)marker_channel] = (double)frame.timemarkers (0).timemarkercode ();
+                double marker_value = (double)frame.timemarkers (row).timemarkercode ();
+                // Route hardware timemarkers through the existing marker queue so the
+                // shared Board::push_package path stays unchanged for non-EDX boards.
+                int marker_res =
+                    insert_marker (marker_value, (int)BrainFlowPresets::DEFAULT_PRESET);
+                if (marker_res != (int)BrainFlowExitCodes::STATUS_OK)
+                {
+                    safe_logger (spdlog::level::err,
+                        "EDX marker queue insert failed: frame_start={:.6f}, sample_row={}, marker_row={}, code={}, res={}",
+                        frame_base_ts, row, marker_channel, marker_value, marker_res);
+                }
             }
             push_package (package.data ());
         }
@@ -881,6 +992,82 @@ int AntNeuroEdxBoard::parse_edx_command (const std::string &config, std::string 
             out["battery_level"] = power_response.powerlist (0).batterylevel ();
         }
     }
+    else if (parts[1] == "trigger_config" && parts.size () >= 3)
+    {
+        // "edx:trigger_config:<ch>,<dutyCycle>,<pulseFreq>,<pulseCount>,<burstFreq>,<burstCount>"
+        std::vector<double> vals;
+        std::stringstream csv (parts[2]);
+        std::string item;
+        while (std::getline (csv, item, ','))
+        {
+            vals.push_back (std::stod (item));
+        }
+        if (vals.size () < 6)
+        {
+            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+        }
+        EdigRPC::gen::Amplifier_SetOutputTriggerChannelsRequest request;
+        request.set_amplifierhandle (amplifier_handle);
+        auto *info = request.add_infos ();
+        info->set_channelindex ((int)vals[0]);
+        info->set_channeltype (EdigRPC::gen::OutputChannelType_TriggerOutput);
+        auto *params_map = info->mutable_parameters ();
+        (*params_map)["dutyCycle"] = vals[1];
+        (*params_map)["pulseFrequency"] = vals[2];
+        (*params_map)["pulseCount"] = vals[3];
+        (*params_map)["burstFrequency"] = vals[4];
+        (*params_map)["burstCount"] = vals[5];
+        EdigRPC::gen::Amplifier_SetOutputTriggerChannelsResponse resp;
+        grpc::ClientContext ctx;
+        ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status status = stub->Amplifier_SetOutputTriggerChannels (&ctx, request, &resp);
+        if (!status.ok ())
+        {
+            return map_status (status);
+        }
+        out["channel"] = (int)vals[0];
+    }
+    else if (parts[1] == "trigger_start" && parts.size () >= 3)
+    {
+        EdigRPC::gen::Amplifier_StartOutputTriggerRequest request;
+        request.set_amplifierhandle (amplifier_handle);
+        std::stringstream csv (parts[2]);
+        std::string item;
+        while (std::getline (csv, item, ','))
+        {
+            request.add_channels (std::stoi (item));
+        }
+        EdigRPC::gen::Amplifier_StartOutputTriggerResponse resp;
+        grpc::ClientContext ctx;
+        ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status status = stub->Amplifier_StartOutputTrigger (&ctx, request, &resp);
+        if (!status.ok ())
+        {
+            return map_status (status);
+        }
+    }
+    else if (parts[1] == "trigger_stop" && parts.size () >= 3)
+    {
+        EdigRPC::gen::Amplifier_StopOutputTriggerRequest request;
+        request.set_amplifierhandle (amplifier_handle);
+        std::stringstream csv (parts[2]);
+        std::string item;
+        while (std::getline (csv, item, ','))
+        {
+            request.add_channels (std::stoi (item));
+        }
+        EdigRPC::gen::Amplifier_StopOutputTriggerResponse resp;
+        grpc::ClientContext ctx;
+        ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status status = stub->Amplifier_StopOutputTrigger (&ctx, request, &resp);
+        if (!status.ok ())
+        {
+            return map_status (status);
+        }
+    }
     else
     {
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
@@ -940,8 +1127,12 @@ int AntNeuroEdxBoard::config_board (std::string config, std::string &response)
         {
             return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
         }
+        if (impedance_mode == mode)
+        {
+            return (int)BrainFlowExitCodes::STATUS_OK;
+        }
         impedance_mode = mode;
-        return (int)BrainFlowExitCodes::STATUS_OK;
+        return apply_mode_change ();
     }
     if (config == "get_info")
     {
@@ -952,6 +1143,8 @@ int AntNeuroEdxBoard::config_board (std::string config, std::string &response)
         info["selected_model"] = selected_model;
         info["selected_key"] = selected_device_key;
         info["selected_serial"] = selected_device_serial;
+        info["impedance_mode"] = impedance_mode;
+        info["impedance_sample_count"] = impedance_sample_count;
         info["timing"] = {
             {"missing_start_frame_count", missing_start_frame_count},
             {"fallback_timestamp_count", fallback_timestamp_count},

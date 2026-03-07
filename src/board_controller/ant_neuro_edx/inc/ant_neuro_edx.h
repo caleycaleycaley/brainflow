@@ -52,6 +52,7 @@ private:
     uint64_t non_monotonic_timestamp_count;
     uint64_t large_gap_count;
     double last_emitted_timestamp;
+    uint64_t impedance_sample_count;
 #ifdef BUILD_ANT_EDX
     std::shared_ptr<grpc::Channel> grpc_channel;
     std::unique_ptr<EdigRPC::gen::EdigRPC::Stub> stub;
@@ -70,6 +71,7 @@ private:
     int set_mode ();
     int configure_stream_params (void *request_ptr);
     int process_frames ();
+    int apply_mode_change ();
     int parse_edx_command (const std::string &config, std::string &response);
     void read_thread ();
     bool parse_bool_flag (const std::string &value, bool &flag);
