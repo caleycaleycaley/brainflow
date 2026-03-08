@@ -9,6 +9,7 @@
 #include <regex>
 #include <set>
 #include <sstream>
+#include <unordered_map>
 
 #include "json.hpp"
 #include "timestamp.h"
@@ -319,7 +320,8 @@ int AntNeuroEdxBoard::load_capabilities ()
     }
     if (!sampling_rates_available.empty ())
     {
-        sampling_rate = sampling_rates_available.front ();
+        sampling_rate = *std::max_element (
+            sampling_rates_available.begin (), sampling_rates_available.end ());
     }
 
     EdigRPC::gen::Amplifier_GetRangesAvailableRequest ranges_req;
@@ -708,6 +710,29 @@ int AntNeuroEdxBoard::process_frames ()
             return (int)BrainFlowExitCodes::GENERAL_ERROR;
         }
 
+        // Map each TimeMarker to its sample row via timestamp offset, then inject
+        // via insert_marker so push_package picks it up from the queue.
+        // Using long long avoids int overflow when TimeMarker.Start is unset (zero).
+        const int frame_marker_count = frame.timemarkers_size ();
+        std::unordered_map<int, double> marker_at_row;
+        if (frame_marker_count > 0 && has_start && sample_dt > 0.0)
+        {
+            for (int mi = 0; mi < frame_marker_count; mi++)
+            {
+                const auto &tm = frame.timemarkers (mi);
+                double marker_ts = ts_to_unix (tm.start ());
+                double offset = marker_ts - frame_base_ts;
+                long long target_row_ll = (long long)std::round (offset / sample_dt);
+                int target_row = (int)std::max (0LL, std::min ((long long)(rows - 1), target_row_ll));
+                marker_at_row[target_row] = (double)tm.timemarkercode ();
+            }
+        }
+        else if (frame_marker_count > 0)
+        {
+            // No frame Start or zero sample_dt: place first marker at row 0.
+            marker_at_row[0] = (double)frame.timemarkers (0).timemarkercode ();
+        }
+
         for (int row = 0; row < rows; row++)
         {
             std::fill (package.begin (), package.end (), 0.0);
@@ -763,19 +788,10 @@ int AntNeuroEdxBoard::process_frames ()
                 }
             }
             last_emitted_timestamp = package[(size_t)timestamp_channel];
-            if (row < frame_marker_count)
+            auto it = marker_at_row.find (row);
+            if (it != marker_at_row.end ())
             {
-                double marker_value = (double)frame.timemarkers (row).timemarkercode ();
-                // Route hardware timemarkers through the existing marker queue so the
-                // shared Board::push_package path stays unchanged for non-EDX boards.
-                int marker_res =
-                    insert_marker (marker_value, (int)BrainFlowPresets::DEFAULT_PRESET);
-                if (marker_res != (int)BrainFlowExitCodes::STATUS_OK)
-                {
-                    safe_logger (spdlog::level::err,
-                        "EDX marker queue insert failed: frame_start={:.6f}, sample_row={}, marker_row={}, code={}, res={}",
-                        frame_base_ts, row, marker_channel, marker_value, marker_res);
-                }
+                insert_marker (it->second, (int)BrainFlowPresets::DEFAULT_PRESET);
             }
             push_package (package.data ());
         }
