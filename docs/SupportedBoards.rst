@@ -1170,8 +1170,8 @@ Optional fields:
 
 Important notes:
 
-- Runtime data layout for board 66 is always derived from :code:`master_board`.
-- :code:`other_info` endpoint format (for example :code:`localhost:3390`) is not supported for board 66.
+- Runtime data layout for board 67 is always derived from :code:`master_board`.
+- :code:`other_info` endpoint format (for example :code:`localhost:3390`) is not supported for board 67.
 
 Initialization example (Python):
 
