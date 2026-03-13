@@ -90,12 +90,30 @@ BrainFlowBoards::BrainFlowBoards()
     }};
 
     // available presets are: default, auxiliary, ancillary, default is required, other presets are optional
-    brainflow_boards_json["boards"]["-3"]["default"] = {{"name", "PlayBack"}};
-    brainflow_boards_json["boards"]["-3"]["auxiliary"] = {{"name", "PlayBack"}};
-    brainflow_boards_json["boards"]["-3"]["ancillary"] = {{"name", "PlayBack"}};
-    brainflow_boards_json["boards"]["-2"]["default"] = {{"name", "Streaming"}};
-    brainflow_boards_json["boards"]["-2"]["auxiliary"] = {{"name", "Streaming"}};
-    brainflow_boards_json["boards"]["-2"]["ancillary"] = {{"name", "Streaming"}};
+    brainflow_boards_json["boards"]["-3"]["default"] = {
+        {"name", "PlayBack"},
+        {"requires_master_board", true},
+        {"master_board_role", "descriptor_source"}};
+    brainflow_boards_json["boards"]["-3"]["auxiliary"] = {
+        {"name", "PlayBack"},
+        {"requires_master_board", true},
+        {"master_board_role", "descriptor_source"}};
+    brainflow_boards_json["boards"]["-3"]["ancillary"] = {
+        {"name", "PlayBack"},
+        {"requires_master_board", true},
+        {"master_board_role", "descriptor_source"}};
+    brainflow_boards_json["boards"]["-2"]["default"] = {
+        {"name", "Streaming"},
+        {"requires_master_board", true},
+        {"master_board_role", "descriptor_source"}};
+    brainflow_boards_json["boards"]["-2"]["auxiliary"] = {
+        {"name", "Streaming"},
+        {"requires_master_board", true},
+        {"master_board_role", "descriptor_source"}};
+    brainflow_boards_json["boards"]["-2"]["ancillary"] = {
+        {"name", "Streaming"},
+        {"requires_master_board", true},
+        {"master_board_role", "descriptor_source"}};
     brainflow_boards_json["boards"]["-1"]["default"] =
     {
         {"name", "Synthetic"},
@@ -1165,6 +1183,8 @@ BrainFlowBoards::BrainFlowBoards()
     brainflow_boards_json["boards"]["67"]["default"] =
     {
         {"name", "AntNeuroEDX"},
+        {"requires_master_board", true},
+        {"master_board_role", "descriptor_source"},
         {"sampling_rate", 2000},
         {"timestamp_channel", 68},
         {"marker_channel", 69},

@@ -9,6 +9,15 @@
 
 #define MAX_CHANNELS 512
 
+namespace
+{
+bool board_requires_master_board (int board_id)
+{
+    json board_descr = BoardShim::get_board_descr (board_id);
+    return board_descr.value ("requires_master_board", false);
+}
+} // namespace
+
 /////////////////////////////////////////
 /////// serialize struct to json ////////
 /////////////////////////////////////////
@@ -265,13 +274,12 @@ void BoardShim::insert_marker (double value, int preset)
 int BoardShim::get_board_id ()
 {
     int master_board_id = board_id;
-    if ((board_id == (int)BoardIds::STREAMING_BOARD) ||
-        (board_id == (int)BoardIds::PLAYBACK_FILE_BOARD) ||
-        (board_id == (int)BoardIds::ANT_NEURO_EDX_BOARD))
+    if (board_requires_master_board (board_id))
     {
         if (params.master_board == (int)BoardIds::NO_BOARD)
         {
-            throw BrainFlowException ("specify master board id using params.master_board",
+            throw BrainFlowException (
+                "specify params.master_board for boards with derived runtime layout",
                 (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR);
         }
         else

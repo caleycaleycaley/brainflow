@@ -577,18 +577,23 @@ class BoardShim(object):
     :type input_params: BrainFlowInputParams
     """
 
+    @classmethod
+    def _requires_master_board(cls, board_id: int) -> bool:
+        board_descr = cls.get_board_descr(board_id)
+        return bool(board_descr.get('requires_master_board', False))
+
     def __init__(self, board_id: int, input_params: BrainFlowInputParams) -> None:
         try:
             self.input_json = input_params.to_json().encode()
         except BaseException:
             self.input_json = input_params.to_json()
         self.board_id = board_id
-        # we need it for streaming board
-        if board_id == BoardIds.STREAMING_BOARD.value or board_id == BoardIds.PLAYBACK_FILE_BOARD.value or board_id == BoardIds.ANT_NEURO_EDX_BOARD.value:
+        if self._requires_master_board(board_id):
             if input_params.master_board != BoardIds.NO_BOARD:
                 self._master_board_id = input_params.master_board
             else:
-                raise BrainFlowError('you need set master board id in BrainFlowInputParams',
+                raise BrainFlowError(
+                    'you need to set master board id in BrainFlowInputParams for boards with derived runtime layout',
                                      BrainFlowExitCodes.INVALID_ARGUMENTS_ERROR.value)
         else:
             self._master_board_id = self.board_id

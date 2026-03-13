@@ -8,6 +8,7 @@ import java.util.Collections;
 import org.apache.commons.lang3.SystemUtils;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.sun.jna.JNIEnv;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
@@ -18,6 +19,11 @@ import com.sun.jna.Native;
 @SuppressWarnings ("deprecation")
 public class BoardShim
 {
+    private static boolean requires_master_board (int board_id) throws BrainFlowError
+    {
+        JsonObject descr = get_board_descr (JsonObject.class, board_id);
+        return descr.has ("requires_master_board") && descr.get ("requires_master_board").getAsBoolean ();
+    }
 
     private interface DllInterface extends Library
     {
@@ -1297,13 +1303,12 @@ public class BoardShim
     {
         this.board_id = board_id;
         this.master_board_id = board_id;
-        if (
-            (board_id == BoardIds.STREAMING_BOARD.get_code ()) || (board_id == BoardIds.PLAYBACK_FILE_BOARD.get_code ()) || (board_id == BoardIds.ANT_NEURO_EDX_BOARD.get_code ())
-        )
+        if (requires_master_board (board_id))
         {
             if (params.get_master_board () == BoardIds.NO_BOARD.get_code ())
             {
-                throw new BrainFlowError ("need to set master board attribute in BrainFlowInputParams",
+                throw new BrainFlowError (
+                        "need to set master board attribute in BrainFlowInputParams for boards with derived runtime layout",
                         BrainFlowExitCode.INVALID_ARGUMENTS_ERROR.get_code ());
             } else
             {
@@ -1321,15 +1326,12 @@ public class BoardShim
     {
         this.board_id = board_id.get_code ();
         this.master_board_id = board_id.get_code ();
-        if (
-            (board_id.get_code () == BoardIds.STREAMING_BOARD.get_code ())
-                    || (board_id.get_code () == BoardIds.PLAYBACK_FILE_BOARD.get_code ())
-                    || (board_id.get_code () == BoardIds.ANT_NEURO_EDX_BOARD.get_code ())
-        )
+        if (requires_master_board (board_id.get_code ()))
         {
             if (params.get_master_board () == BoardIds.NO_BOARD.get_code ())
             {
-                throw new BrainFlowError ("need to set master board attribute in BrainFlowInputParams",
+                throw new BrainFlowError (
+                        "need to set master board attribute in BrainFlowInputParams for boards with derived runtime layout",
                         BrainFlowExitCode.INVALID_ARGUMENTS_ERROR.get_code ());
             } else
             {

@@ -231,7 +231,11 @@ struct BoardShim
 
     function BoardShim(id::Integer, params::BrainFlowInputParams)
         master_id = id
-        if id == Integer(STREAMING_BOARD) || id == Integer(PLAYBACK_FILE_BOARD) || id == Integer(ANT_NEURO_EDX_BOARD)
+        if get(get_board_descr(id), "requires_master_board", false)
+            if Integer(params.master_board) == Integer(NO_BOARD)
+                throw(BrainFlowError("master board id is required for boards with derived runtime layout",
+                                     Integer(INVALID_ARGUMENTS_ERROR)))
+            end
             master_id = Integer(params.master_board)
         end
         new(master_id, id, JSON.json(params))

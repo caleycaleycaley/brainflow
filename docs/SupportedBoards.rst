@@ -1151,7 +1151,7 @@ For more information about Ant Neuro boards please refer to their User Manual.
 Ant Neuro EDX
 ~~~~~~~~~~~~~~
 
-EDX transport exposes ANT Neuro amplifiers through an external gRPC service.
+EDX is a transport board that exposes ANT Neuro amplifiers through an external gRPC service.
 
 Use board id:
 
@@ -1171,6 +1171,7 @@ Optional fields:
 Important notes:
 
 - Runtime data layout for board 67 is always derived from :code:`master_board`.
+- Device-discovered capabilities such as rates, ranges and impedance support refine validation and configuration, but do not silently replace the public descriptor layout.
 - :code:`other_info` endpoint format (for example :code:`localhost:3390`) is not supported for board 67.
 
 Initialization example (Python):

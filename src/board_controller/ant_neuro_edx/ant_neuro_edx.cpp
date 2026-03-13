@@ -159,7 +159,7 @@ int AntNeuroEdxBoard::ensure_connected ()
     if (!params.other_info.empty () && params.ip_address.empty () && (params.ip_port <= 0))
     {
         safe_logger (spdlog::level::err,
-            "EDX endpoint in other_info is no longer supported for board 66, use ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported for board 67, use ip_address/ip_port");
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
@@ -178,7 +178,7 @@ int AntNeuroEdxBoard::ensure_connected ()
     if (!params.other_info.empty ())
     {
         safe_logger (spdlog::level::warn,
-            "EDX endpoint in other_info is no longer supported for board 66, use ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported for board 67, use ip_address/ip_port");
     }
 
     if ((params.ip_address.find ("://") != std::string::npos) ||
@@ -403,6 +403,8 @@ int AntNeuroEdxBoard::prepare_session ()
 
     try
     {
+        // EDX is a transport board; the public row layout still comes from the
+        // selected legacy ANT master board descriptor.
         board_descr =
             boards_struct.brainflow_boards_json["boards"][std::to_string (requested_master_board)];
         sampling_rate = board_descr["default"]["sampling_rate"];
@@ -423,6 +425,8 @@ int AntNeuroEdxBoard::prepare_session ()
         release_session ();
         return res;
     }
+    // Device-discovered capabilities refine validation and configuration, but
+    // they do not replace the descriptor shape derived from requested_master_board.
 
     initialized = true;
     return (int)BrainFlowExitCodes::STATUS_OK;

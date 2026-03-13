@@ -161,25 +161,27 @@ export class BoardShim
 
     private inputJson: string;
 
+    private static requiresMasterBoard(boardId: BoardIds): boolean
+    {
+        const boardDescr = BoardShim.getBoardDescr(boardId);
+        return !!boardDescr.requires_master_board;
+    }
+
     constructor(boardId: BoardIds, inputParams: Partial<IBrainFlowInputParams>)
     {
         this.boardId = boardId;
         const hasMasterBoard =
             inputParams.masterBoard !== undefined && inputParams.masterBoard !== null;
-        if ((boardId === BoardIds.STREAMING_BOARD ||
-                boardId === BoardIds.PLAYBACK_FILE_BOARD ||
-                boardId === BoardIds.ANT_NEURO_EDX_BOARD) &&
-            (!hasMasterBoard || inputParams.masterBoard === BoardIds.NO_BOARD))
+        const requiresMasterBoard = BoardShim.requiresMasterBoard(boardId);
+        if (requiresMasterBoard && (!hasMasterBoard || inputParams.masterBoard === BoardIds.NO_BOARD))
         {
             throw new BrainFlowError (
                 BrainFlowExitCodes.INVALID_ARGUMENTS_ERROR,
-                'You need to provide master board id for streaming/playback/EDX boards',
+                'You need to provide master board id for boards with derived runtime layout',
             );
         }
         this.masterBoardId =
-            ((boardId === BoardIds.STREAMING_BOARD ||
-                boardId === BoardIds.PLAYBACK_FILE_BOARD ||
-                boardId === BoardIds.ANT_NEURO_EDX_BOARD) &&
+            (requiresMasterBoard &&
                 hasMasterBoard &&
                 inputParams.masterBoard !== BoardIds.NO_BOARD) ?
                 (inputParams.masterBoard as BoardIds) :
