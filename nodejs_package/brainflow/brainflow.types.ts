@@ -75,7 +75,7 @@ export enum BoardIds {
     OB3000_24_CHANNELS_BOARD = 63,
     BIOLISTENER_BOARD = 64,
     IRONBCI_32_BOARD = 65,
-    ANT_NEURO_EDX_BOARD = 66
+    ANT_NEURO_EDX_BOARD = 67
 }
 
 export enum IpProtocolTypes {

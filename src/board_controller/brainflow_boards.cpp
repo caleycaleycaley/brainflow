@@ -85,7 +85,7 @@ BrainFlowBoards::BrainFlowBoards()
             {"64", json::object()},
             {"65", json::object()},
             {"66", json::object()},
-            {"67", json::object()}
+            {"67", json::object()},
         }
     }};
 
@@ -925,7 +925,9 @@ BrainFlowBoards::BrainFlowBoards()
         {"num_rows", 34},
         {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24}},
         {"emg_channels", {25, 26, 27, 28}},
-        {"resistance_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 29, 30}},
+        {"resistance_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24}},
+        {"ref_resistance_channels", {29}},
+        {"gnd_resistance_channels", {30}},
         {"other_channels", {31}}
     };
     brainflow_boards_json["boards"]["52"]["default"] =
@@ -1149,8 +1151,6 @@ BrainFlowBoards::BrainFlowBoards()
         {"emg_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}},
         {"ecg_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}}
     };
-    // Transport descriptor only for EDX board.
-    // Runtime shape/channels for board 66 are always derived from master_board.
     brainflow_boards_json["boards"]["66"]["default"] =
     {
         {"name", "KnightIMU"},
@@ -1166,17 +1166,15 @@ BrainFlowBoards::BrainFlowBoards()
     {
         {"name", "AntNeuroEDX"},
         {"sampling_rate", 2000},
-        {"timestamp_channel", 90},
-        {"marker_channel", 91},
+        {"timestamp_channel", 68},
+        {"marker_channel", 69},
         {"package_num_channel", 0},
-        {"num_rows", 92},
-        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-            32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64}},
-        {"emg_channels", {65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88}},
-        {"resistance_channels", {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-            32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
-            65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88}},
-        {"other_channels", {89}}
+        {"num_rows", 70},
+        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
+        {"resistance_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
+        {"ref_resistance_channels", {9}},
+        {"gnd_resistance_channels", {10}},
+        {"other_channels", {67}}
     };
 }
 

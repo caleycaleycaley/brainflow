@@ -44,7 +44,6 @@ private:
     double bipolar_range;
     bool impedance_mode;
     std::vector<int> active_channel_indices;
-    std::vector<int> impedance_channel_rows;
     std::string endpoint;
     int trigger_channel_index;
     // Timing diagnostics are exposed via get_info and do not alter stream shape.
@@ -52,11 +51,8 @@ private:
     uint64_t fallback_timestamp_count;
     uint64_t non_monotonic_timestamp_count;
     uint64_t large_gap_count;
-    uint64_t impedance_payload_values_total;
-    uint64_t impedance_rows_mapped;
-    uint64_t impedance_rows_truncated_count;
-    bool impedance_truncation_logged;
     double last_emitted_timestamp;
+    uint64_t impedance_sample_count;
 #ifdef BUILD_ANT_EDX
     std::shared_ptr<grpc::Channel> grpc_channel;
     std::unique_ptr<EdigRPC::gen::EdigRPC::Stub> stub;
@@ -75,13 +71,13 @@ private:
     int set_mode ();
     int configure_stream_params (void *request_ptr);
     int process_frames ();
+    int apply_mode_change ();
     int parse_edx_command (const std::string &config, std::string &response);
     void read_thread ();
     bool parse_bool_flag (const std::string &value, bool &flag);
 #ifdef BUILD_ANT_EDX
     int connect_and_create_device ();
     int load_capabilities ();
-    void rebuild_impedance_channel_rows ();
     int set_idle_mode ();
     int validate_sampling_rate (int value);
     int validate_reference_range (double value);

@@ -3,12 +3,13 @@
 #ifdef BUILD_ANT_EDX
 
 #include <algorithm>
-#include <cctype>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <regex>
 #include <set>
 #include <sstream>
+#include <unordered_map>
 
 #include "json.hpp"
 #include "timestamp.h"
@@ -17,147 +18,105 @@ using json = nlohmann::json;
 
 namespace
 {
-    constexpr int edx_board_id = (int)BoardIds::ANT_NEURO_EDX_BOARD;
+constexpr int edx_board_id = (int)BoardIds::ANT_NEURO_EDX_BOARD;
 
-    bool is_ant_master_board (int board_id)
+bool is_ant_master_board (int board_id)
+{
+    return ((board_id >= (int)BoardIds::ANT_NEURO_EE_410_BOARD &&
+               board_id <= (int)BoardIds::ANT_NEURO_EE_225_BOARD) ||
+        (board_id == (int)BoardIds::ANT_NEURO_EE_511_BOARD));
+}
+
+std::string to_upper (std::string s)
+{
+    std::transform (s.begin (), s.end (), s.begin (),
+        [] (unsigned char c) { return (char)std::toupper (c); });
+    return s;
+}
+
+std::vector<std::string> expected_tokens (int master_board)
+{
+    switch ((BoardIds)master_board)
     {
-        return ((board_id >= (int)BoardIds::ANT_NEURO_EE_410_BOARD &&
-                    board_id <= (int)BoardIds::ANT_NEURO_EE_225_BOARD) ||
-            (board_id == (int)BoardIds::ANT_NEURO_EE_511_BOARD));
+        case BoardIds::ANT_NEURO_EE_511_BOARD:
+            return {"EE-511", "EE-5XX"};
+        case BoardIds::ANT_NEURO_EE_410_BOARD:
+        case BoardIds::ANT_NEURO_EE_411_BOARD:
+        case BoardIds::ANT_NEURO_EE_430_BOARD:
+            return {"EE-4XX"};
+        default:
+            return {"EE-2XX"};
     }
+}
 
-    std::string to_upper (std::string s)
+std::set<std::string> extract_tokens (const std::string &value)
+{
+    std::set<std::string> result;
+    std::regex re ("EE[\\-_ ]?([245][0-9X]{2})");
+    std::string upper = to_upper (value);
+    auto begin = std::sregex_iterator (upper.begin (), upper.end (), re);
+    auto end = std::sregex_iterator ();
+    for (auto it = begin; it != end; ++it)
     {
-        std::transform (s.begin (), s.end (), s.begin (),
-            [] (unsigned char c) { return (char)std::toupper (c); });
-        return s;
-    }
-
-    std::vector<std::string> expected_tokens (int master_board)
-    {
-        switch ((BoardIds)master_board)
+        std::string suffix = (*it)[1].str ();
+        std::string token = "EE-" + suffix;
+        result.insert (token);
+        if (suffix.size () == 3 && std::isdigit ((unsigned char)suffix[0]))
         {
-            case BoardIds::ANT_NEURO_EE_511_BOARD:
-                return {"EE-511", "EE-5XX"};
-            case BoardIds::ANT_NEURO_EE_410_BOARD:
-            case BoardIds::ANT_NEURO_EE_411_BOARD:
-            case BoardIds::ANT_NEURO_EE_430_BOARD:
-                return {"EE-4XX"};
-            default:
-                return {"EE-2XX"};
-        }
-    }
-
-    std::set<std::string> extract_tokens (const std::string &value)
-    {
-        std::set<std::string> result;
-        std::regex re ("EE[\\-_ ]?([245][0-9X]{2})");
-        std::string upper = to_upper (value);
-        auto begin = std::sregex_iterator (upper.begin (), upper.end (), re);
-        auto end = std::sregex_iterator ();
-        for (auto it = begin; it != end; ++it)
-        {
-            std::string suffix = (*it)[1].str ();
-            std::string token = "EE-" + suffix;
-            result.insert (token);
-            if (suffix.size () == 3 && std::isdigit ((unsigned char)suffix[0]))
-            {
-                result.insert (std::string ("EE-") + suffix[0] + "XX");
-            }
-        }
-        return result;
-    }
-
-    bool has_match (const std::set<std::string> &tokens, const std::vector<std::string> &need)
-    {
-        for (const auto &token : need)
-        {
-            if (tokens.find (token) != tokens.end ())
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool is_reference_or_ground_channel_name (const std::string &name)
-    {
-        std::string upper = to_upper (name);
-        return (upper.find ("REF") != std::string::npos) ||
-            (upper.find ("GND") != std::string::npos) ||
-            (upper.find ("GROUND") != std::string::npos) ||
-            (upper.find ("CMS") != std::string::npos);
-    }
-
-    double ts_to_unix (const google::protobuf::Timestamp &ts)
-    {
-        return (double)ts.seconds () + ((double)ts.nanos () / 1000000000.0);
-    }
-
-    int map_status (const grpc::Status &status)
-    {
-        if (status.ok ())
-        {
-            return (int)BrainFlowExitCodes::STATUS_OK;
-        }
-        if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
-        {
-            return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
-        }
-        if (status.error_code () == grpc::StatusCode::INVALID_ARGUMENT)
-        {
-            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
-        }
-        return (int)BrainFlowExitCodes::GENERAL_ERROR;
-    }
-
-    int handshake_status_to_brainflow (const grpc::Status &status)
-    {
-        if (status.ok ())
-        {
-            return (int)BrainFlowExitCodes::STATUS_OK;
-        }
-
-        if (status.error_code () == grpc::StatusCode::UNIMPLEMENTED)
-        {
-            return (int)BrainFlowExitCodes::UNSUPPORTED_BOARD_ERROR;
-        }
-        if (status.error_code () == grpc::StatusCode::UNAVAILABLE)
-        {
-            return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
-        }
-        if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
-        {
-            return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
-        }
-        return map_status (status);
-    }
-
-    std::vector<int> try_get_vec (const json &obj, const char *key)
-    {
-        try
-        {
-            return obj[key].get<std::vector<int>> ();
-        }
-        catch (...)
-        {
-            return {};
+            result.insert (std::string ("EE-") + suffix[0] + "XX");
         }
     }
+    return result;
+}
 
-    void append_impedance_values (
-        const google::protobuf::RepeatedPtrField<EdigRPC::gen::TupleImpledanceChannel> &src,
-        std::vector<double> &dst)
+bool has_match (const std::set<std::string> &tokens, const std::vector<std::string> &need)
+{
+    for (const auto &token : need)
     {
-        for (const auto &entry : src)
+        if (tokens.find (token) != tokens.end ())
         {
-            dst.push_back ((double)entry.value ());
+            return true;
         }
     }
+    return false;
+}
+
+double ts_to_unix (const google::protobuf::Timestamp &ts)
+{
+    return (double)ts.seconds () + ((double)ts.nanos () / 1000000000.0);
+}
+
+int map_status (const grpc::Status &status)
+{
+    if (status.ok ())
+    {
+        return (int)BrainFlowExitCodes::STATUS_OK;
+    }
+    if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
+    {
+        return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+    }
+    if (status.error_code () == grpc::StatusCode::INVALID_ARGUMENT)
+    {
+        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+    }
+    return (int)BrainFlowExitCodes::GENERAL_ERROR;
+}
+
+std::vector<int> try_get_vec (const json &obj, const char *key)
+{
+    try
+    {
+        return obj[key].get<std::vector<int>> ();
+    }
+    catch (...)
+    {
+        return {};
+    }
+}
 } // namespace
 
-AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params)
-    : Board (edx_board_id, params)
+AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params) : Board (edx_board_id, params)
 {
     keep_alive = false;
     initialized = false;
@@ -175,11 +134,8 @@ AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params)
     fallback_timestamp_count = 0;
     non_monotonic_timestamp_count = 0;
     large_gap_count = 0;
-    impedance_payload_values_total = 0;
-    impedance_rows_mapped = 0;
-    impedance_rows_truncated_count = 0;
-    impedance_truncation_logged = false;
     last_emitted_timestamp = -1.0;
+    impedance_sample_count = 0;
 }
 
 AntNeuroEdxBoard::~AntNeuroEdxBoard ()
@@ -192,8 +148,7 @@ int AntNeuroEdxBoard::validate_master_board ()
 {
     if (!is_ant_master_board (requested_master_board))
     {
-        safe_logger (
-            spdlog::level::err, "invalid master_board for EDX: {}", requested_master_board);
+        safe_logger (spdlog::level::err, "invalid master_board for EDX: {}", requested_master_board);
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
     return (int)BrainFlowExitCodes::STATUS_OK;
@@ -204,8 +159,7 @@ int AntNeuroEdxBoard::ensure_connected ()
     if (!params.other_info.empty () && params.ip_address.empty () && (params.ip_port <= 0))
     {
         safe_logger (spdlog::level::err,
-            "EDX endpoint in other_info is no longer supported for board 66, use "
-            "ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported for board 66, use ip_address/ip_port");
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
@@ -217,23 +171,22 @@ int AntNeuroEdxBoard::ensure_connected ()
 
     if ((params.ip_port <= 0) || (params.ip_port > 65535))
     {
-        safe_logger (
-            spdlog::level::err, "EDX requires valid ip_port (1..65535), got {}", params.ip_port);
+        safe_logger (spdlog::level::err, "EDX requires valid ip_port (1..65535), got {}", params.ip_port);
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
     if (!params.other_info.empty ())
     {
         safe_logger (spdlog::level::warn,
-            "EDX endpoint in other_info is no longer supported for board 66, use "
-            "ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported for board 66, use ip_address/ip_port");
     }
 
     if ((params.ip_address.find ("://") != std::string::npos) ||
         (params.ip_address.find ("/") != std::string::npos))
     {
         safe_logger (spdlog::level::err,
-            "EDX requires host-only ip_address, got URI-like value '{}'", params.ip_address);
+            "EDX requires host-only ip_address, got URI-like value '{}'",
+            params.ip_address);
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
@@ -241,8 +194,7 @@ int AntNeuroEdxBoard::ensure_connected ()
 
     grpc_channel = grpc::CreateChannel (endpoint, grpc::InsecureChannelCredentials ());
     stub = EdigRPC::gen::EdigRPC::NewStub (grpc_channel);
-    return stub ? (int)BrainFlowExitCodes::STATUS_OK :
-                  (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
+    return stub ? (int)BrainFlowExitCodes::STATUS_OK : (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
 }
 
 int AntNeuroEdxBoard::connect_and_create_device ()
@@ -319,10 +271,9 @@ int AntNeuroEdxBoard::load_capabilities ()
     channels_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetChannelsAvailableResponse channels_resp;
     grpc::ClientContext channels_ctx;
-    channels_ctx.set_deadline (
-        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
-    grpc::Status status =
-        stub->Amplifier_GetChannelsAvailable (&channels_ctx, channels_req, &channels_resp);
+    channels_ctx.set_deadline (std::chrono::system_clock::now () +
+        std::chrono::seconds (std::max (1, params.timeout)));
+    grpc::Status status = stub->Amplifier_GetChannelsAvailable (&channels_ctx, channels_req, &channels_resp);
     if (!status.ok ())
     {
         return map_status (status);
@@ -355,8 +306,8 @@ int AntNeuroEdxBoard::load_capabilities ()
     rates_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetSamplingRatesAvailableResponse rates_resp;
     grpc::ClientContext rates_ctx;
-    rates_ctx.set_deadline (
-        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
+    rates_ctx.set_deadline (std::chrono::system_clock::now () +
+        std::chrono::seconds (std::max (1, params.timeout)));
     status = stub->Amplifier_GetSamplingRatesAvailable (&rates_ctx, rates_req, &rates_resp);
     if (!status.ok ())
     {
@@ -369,15 +320,16 @@ int AntNeuroEdxBoard::load_capabilities ()
     }
     if (!sampling_rates_available.empty ())
     {
-        sampling_rate = sampling_rates_available.front ();
+        sampling_rate = *std::max_element (
+            sampling_rates_available.begin (), sampling_rates_available.end ());
     }
 
     EdigRPC::gen::Amplifier_GetRangesAvailableRequest ranges_req;
     ranges_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetRangesAvailableResponse ranges_resp;
     grpc::ClientContext ranges_ctx;
-    ranges_ctx.set_deadline (
-        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
+    ranges_ctx.set_deadline (std::chrono::system_clock::now () +
+        std::chrono::seconds (std::max (1, params.timeout)));
     status = stub->Amplifier_GetRangesAvailable (&ranges_ctx, ranges_req, &ranges_resp);
     if (!status.ok ())
     {
@@ -389,13 +341,11 @@ int AntNeuroEdxBoard::load_capabilities ()
     {
         if (entry.first == (int)EdigRPC::gen::ChannelPolarity::Referential)
         {
-            reference_ranges_available.assign (
-                entry.second.values ().begin (), entry.second.values ().end ());
+            reference_ranges_available.assign (entry.second.values ().begin (), entry.second.values ().end ());
         }
         else if (entry.first == (int)EdigRPC::gen::ChannelPolarity::Bipolar)
         {
-            bipolar_ranges_available.assign (
-                entry.second.values ().begin (), entry.second.values ().end ());
+            bipolar_ranges_available.assign (entry.second.values ().begin (), entry.second.values ().end ());
         }
     }
 
@@ -403,8 +353,8 @@ int AntNeuroEdxBoard::load_capabilities ()
     modes_req.set_amplifierhandle (amplifier_handle);
     EdigRPC::gen::Amplifier_GetModesAvailableResponse modes_resp;
     grpc::ClientContext modes_ctx;
-    modes_ctx.set_deadline (
-        std::chrono::system_clock::now () + std::chrono::seconds (std::max (1, params.timeout)));
+    modes_ctx.set_deadline (std::chrono::system_clock::now () +
+        std::chrono::seconds (std::max (1, params.timeout)));
     status = stub->Amplifier_GetModesAvailable (&modes_ctx, modes_req, &modes_resp);
     if (!status.ok ())
     {
@@ -424,60 +374,13 @@ int AntNeuroEdxBoard::load_capabilities ()
     {
         bipolar_range = bipolar_ranges_available.front ();
     }
-    if (selected_model == "EE-511" ||
-        to_upper (selected_device_serial).find ("EE511") != std::string::npos)
+    if (selected_model == "EE-511" || to_upper (selected_device_serial).find ("EE511") != std::string::npos)
     {
         reference_range = 1.0;
         bipolar_range = 2.5;
     }
 
-    rebuild_impedance_channel_rows ();
-
     return (int)BrainFlowExitCodes::STATUS_OK;
-}
-
-void AntNeuroEdxBoard::rebuild_impedance_channel_rows ()
-{
-    impedance_channel_rows.clear ();
-
-    std::vector<int> eeg_channels = try_get_vec (board_descr["default"], "eeg_channels");
-    std::vector<int> emg_channels = try_get_vec (board_descr["default"], "emg_channels");
-    std::vector<int> resistance_channels =
-        try_get_vec (board_descr["default"], "resistance_channels");
-
-    std::set<int> assigned_rows (eeg_channels.begin (), eeg_channels.end ());
-    assigned_rows.insert (emg_channels.begin (), emg_channels.end ());
-
-    std::vector<int> extra_resistance_rows;
-    for (int row : resistance_channels)
-    {
-        if (assigned_rows.find (row) == assigned_rows.end ())
-        {
-            extra_resistance_rows.push_back (row);
-        }
-    }
-
-    int eeg_idx = 0;
-    int emg_idx = 0;
-    int extra_idx = 0;
-    for (const auto &meta : channel_meta)
-    {
-        if ((meta.polarity == EdigRPC::gen::ChannelPolarity::Referential) &&
-            (eeg_idx < (int)eeg_channels.size ()))
-        {
-            impedance_channel_rows.push_back (eeg_channels[(size_t)eeg_idx++]);
-        }
-        else if ((meta.polarity == EdigRPC::gen::ChannelPolarity::Bipolar) &&
-            (emg_idx < (int)emg_channels.size ()))
-        {
-            impedance_channel_rows.push_back (emg_channels[(size_t)emg_idx++]);
-        }
-        else if (is_reference_or_ground_channel_name (meta.name) &&
-            (extra_idx < (int)extra_resistance_rows.size ()))
-        {
-            impedance_channel_rows.push_back (extra_resistance_rows[(size_t)extra_idx++]);
-        }
-    }
 }
 
 int AntNeuroEdxBoard::prepare_session ()
@@ -496,30 +399,6 @@ int AntNeuroEdxBoard::prepare_session ()
     if (res != (int)BrainFlowExitCodes::STATUS_OK)
     {
         return res;
-    }
-
-    // Fail fast on incompatible gRPC service contract before device/session flow.
-    {
-        EdigRPC::gen::GetStateRequest state_req;
-        EdigRPC::gen::GetStateResponse state_resp;
-        grpc::ClientContext state_ctx;
-        state_ctx.set_deadline (std::chrono::system_clock::now () +
-            std::chrono::seconds (std::max (1, params.timeout)));
-        grpc::Status state_status = stub->GetState (&state_ctx, state_req, &state_resp);
-        if (!state_status.ok ())
-        {
-            safe_logger (spdlog::level::err,
-                "EDX handshake failed: GetState RPC not usable (grpc_code={}, message='{}'). "
-                "Likely client/server proto contract mismatch or endpoint misconfiguration.",
-                (int)state_status.error_code (), state_status.error_message ());
-            return handshake_status_to_brainflow (state_status);
-        }
-        if (state_resp.id ().empty ())
-        {
-            safe_logger (spdlog::level::err,
-                "EDX handshake failed: GetState returned empty Id, refusing to continue.");
-            return (int)BrainFlowExitCodes::UNSUPPORTED_BOARD_ERROR;
-        }
     }
 
     try
@@ -579,8 +458,9 @@ int AntNeuroEdxBoard::set_mode ()
 {
     EdigRPC::gen::Amplifier_SetModeRequest request;
     request.set_amplifierhandle (amplifier_handle);
-    request.set_mode (impedance_mode ? EdigRPC::gen::AmplifierMode::AmplifierMode_Impedance :
-                                       EdigRPC::gen::AmplifierMode::AmplifierMode_Eeg);
+    request.set_mode (
+        impedance_mode ? EdigRPC::gen::AmplifierMode::AmplifierMode_Impedance :
+                         EdigRPC::gen::AmplifierMode::AmplifierMode_Eeg);
     configure_stream_params (&request);
 
     EdigRPC::gen::Amplifier_SetModeResponse response;
@@ -610,11 +490,90 @@ int AntNeuroEdxBoard::set_idle_mode ()
     return map_status (status);
 }
 
+int AntNeuroEdxBoard::apply_mode_change ()
+{
+    if (!initialized)
+    {
+        return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
+    }
+
+    bool was_streaming = is_streaming || keep_alive;
+    if (was_streaming)
+    {
+        safe_logger (spdlog::level::info, "EDX apply_mode_change: stopping current stream (impedance_mode={})",
+            impedance_mode ? 1 : 0);
+        keep_alive = false;
+        is_streaming = false;
+        if (streaming_thread.joinable ())
+        {
+            streaming_thread.join ();
+        }
+    }
+
+    safe_logger (spdlog::level::info, "EDX apply_mode_change: calling set_mode (impedance_mode={})",
+        impedance_mode ? 1 : 0);
+    int res = set_mode ();
+    if (res != (int)BrainFlowExitCodes::STATUS_OK)
+    {
+        safe_logger (spdlog::level::err, "EDX apply_mode_change: set_mode failed with {}", res);
+        return res;
+    }
+
+    if (!was_streaming)
+    {
+        safe_logger (spdlog::level::info, "EDX apply_mode_change: was not streaming, done");
+        return (int)BrainFlowExitCodes::STATUS_OK;
+    }
+
+    last_emitted_timestamp = -1.0;
+    non_monotonic_timestamp_count = 0;
+    large_gap_count = 0;
+    fallback_timestamp_count = 0;
+    missing_start_frame_count = 0;
+    impedance_sample_count = 0;
+    keep_alive = true;
+    state = (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+    streaming_thread = std::thread ([this] { read_thread (); });
+
+    // Impedance mode needs longer to produce first frame (amplifier settling)
+    int wait_secs = std::max (1, params.timeout);
+    if (impedance_mode && wait_secs < 30)
+    {
+        wait_secs = 30;
+    }
+    safe_logger (spdlog::level::info, "EDX apply_mode_change: waiting up to {}s for first frame", wait_secs);
+    std::unique_lock<std::mutex> lk (wait_mutex);
+    if (wait_cv.wait_for (
+            lk, std::chrono::seconds (wait_secs),
+            [this] { return state != (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR; }))
+    {
+        if (state == (int)BrainFlowExitCodes::STATUS_OK)
+        {
+            is_streaming = true;
+            safe_logger (spdlog::level::info, "EDX apply_mode_change: streaming started");
+        }
+        return state;
+    }
+
+    safe_logger (spdlog::level::err, "EDX apply_mode_change: timed out after {}s waiting for first frame", wait_secs);
+    keep_alive = false;
+    if (streaming_thread.joinable ())
+    {
+        streaming_thread.join ();
+    }
+    return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
+}
+
 void AntNeuroEdxBoard::read_thread ()
 {
-    int sleep_time_ms = 5;
+    int sleep_time_ms = impedance_mode ? 100 : 5;
     int wait_attempts = 0;
-    int max_wait_attempts = std::max (1, params.timeout) * 1000 / sleep_time_ms;
+    int wait_secs = std::max (1, params.timeout);
+    if (impedance_mode && wait_secs < 30)
+    {
+        wait_secs = 30;
+    }
+    int max_wait_attempts = wait_secs * 1000 / sleep_time_ms;
 
     while (keep_alive)
     {
@@ -655,7 +614,10 @@ int AntNeuroEdxBoard::process_frames ()
     EdigRPC::gen::Amplifier_GetFrameResponse response;
 
     grpc::ClientContext ctx;
-    ctx.set_deadline (std::chrono::system_clock::now () + std::chrono::milliseconds (500));
+    // Impedance frames arrive less frequently; use longer deadline to avoid
+    // premature DEADLINE_EXCEEDED that masks valid settling-time delays.
+    int deadline_ms = impedance_mode ? 3000 : 500;
+    ctx.set_deadline (std::chrono::system_clock::now () + std::chrono::milliseconds (deadline_ms));
     grpc::Status status = stub->Amplifier_GetFrame (&ctx, request, &response);
     if (!status.ok ())
     {
@@ -672,8 +634,11 @@ int AntNeuroEdxBoard::process_frames ()
     int marker_channel = board_descr["default"]["marker_channel"];
     std::vector<int> eeg_channels = try_get_vec (board_descr["default"], "eeg_channels");
     std::vector<int> emg_channels = try_get_vec (board_descr["default"], "emg_channels");
-    std::vector<int> resistance_channels =
-        try_get_vec (board_descr["default"], "resistance_channels");
+    std::vector<int> resistance_channels = try_get_vec (board_descr["default"], "resistance_channels");
+    std::vector<int> ref_resistance_channels =
+        try_get_vec (board_descr["default"], "ref_resistance_channels");
+    std::vector<int> gnd_resistance_channels =
+        try_get_vec (board_descr["default"], "gnd_resistance_channels");
     std::vector<int> other_channels = try_get_vec (board_descr["default"], "other_channels");
     std::vector<double> package ((size_t)num_rows, 0.0);
     const double sample_dt = (sampling_rate > 0) ? (1.0 / (double)sampling_rate) : 0.0;
@@ -683,47 +648,39 @@ int AntNeuroEdxBoard::process_frames ()
     {
         const bool has_start = frame.has_start ();
         const double frame_base_ts = has_start ? ts_to_unix (frame.start ()) : get_timestamp ();
+        const int frame_marker_count = frame.timemarkers_size ();
         if (!has_start)
         {
             missing_start_frame_count++;
         }
 
-        bool impedance_frame = impedance_mode ||
-            frame.frametype () ==
-                EdigRPC::gen::AmplifierFrameType::AmplifierFrameType_ImpedanceVoltages;
+        bool impedance_frame =
+            impedance_mode || frame.frametype () == EdigRPC::gen::AmplifierFrameType::AmplifierFrameType_ImpedanceVoltages;
         if (impedance_frame)
         {
             std::fill (package.begin (), package.end (), 0.0);
-            const std::vector<int> &impedance_rows =
-                impedance_channel_rows.empty () ? resistance_channels : impedance_channel_rows;
-            std::vector<double> impedance_values;
-            impedance_values.reserve ((size_t)frame.impedance ().channels_size () +
-                (size_t)frame.impedance ().reference_size () +
-                (size_t)frame.impedance ().ground_size ());
-            append_impedance_values (frame.impedance ().channels (), impedance_values);
-            append_impedance_values (frame.impedance ().reference (), impedance_values);
-            append_impedance_values (frame.impedance ().ground (), impedance_values);
-
-            impedance_payload_values_total += (uint64_t)impedance_values.size ();
-            impedance_rows_mapped = (uint64_t)impedance_rows.size ();
-            if (impedance_values.size () > impedance_rows.size ())
+            for (size_t i = 0;
+                 i < frame.impedance ().channels ().size () && i < resistance_channels.size ();
+                 i++)
             {
-                impedance_rows_truncated_count +=
-                    (uint64_t)(impedance_values.size () - impedance_rows.size ());
-                if (!impedance_truncation_logged)
-                {
-                    safe_logger (spdlog::level::warn,
-                        "EDX impedance payload has more values ({}) than mapped rows ({}). "
-                        "Extra values are truncated.",
-                        impedance_values.size (), impedance_rows.size ());
-                    impedance_truncation_logged = true;
-                }
+                package[(size_t)resistance_channels[i]] =
+                    (double)frame.impedance ().channels ((int)i).value ();
             }
-
-            size_t mapped = std::min (impedance_values.size (), impedance_rows.size ());
-            for (size_t i = 0; i < mapped; i++)
+            for (size_t i = 0;
+                 i < frame.impedance ().reference ().size () &&
+                     i < ref_resistance_channels.size ();
+                 i++)
             {
-                package[(size_t)impedance_rows[i]] = impedance_values[i];
+                package[(size_t)ref_resistance_channels[i]] =
+                    (double)frame.impedance ().reference ((int)i).value ();
+            }
+            for (size_t i = 0;
+                 i < frame.impedance ().ground ().size () &&
+                     i < gnd_resistance_channels.size ();
+                 i++)
+            {
+                package[(size_t)gnd_resistance_channels[i]] =
+                    (double)frame.impedance ().ground ((int)i).value ();
             }
             package[(size_t)package_num_channel] = (double)package_num++;
             package[(size_t)timestamp_channel] = frame_base_ts;
@@ -737,13 +694,13 @@ int AntNeuroEdxBoard::process_frames ()
                 {
                     non_monotonic_timestamp_count++;
                 }
-                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) >
-                    large_gap_threshold)
+                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) > large_gap_threshold)
                 {
                     large_gap_count++;
                 }
             }
             last_emitted_timestamp = package[(size_t)timestamp_channel];
+            impedance_sample_count++;
             push_package (package.data ());
             continue;
         }
@@ -755,6 +712,28 @@ int AntNeuroEdxBoard::process_frames ()
             return (int)BrainFlowExitCodes::GENERAL_ERROR;
         }
 
+        // Map each TimeMarker to its sample row via timestamp offset, then inject
+        // via insert_marker so push_package picks it up from the queue.
+        // Using long long avoids int overflow when TimeMarker.Start is unset (zero).
+        std::unordered_map<int, double> marker_at_row;
+        if (frame_marker_count > 0 && has_start && sample_dt > 0.0)
+        {
+            for (int mi = 0; mi < frame_marker_count; mi++)
+            {
+                const auto &tm = frame.timemarkers (mi);
+                double marker_ts = ts_to_unix (tm.start ());
+                double offset = marker_ts - frame_base_ts;
+                long long target_row_ll = (long long)std::round (offset / sample_dt);
+                int target_row = (int)std::max (0LL, std::min ((long long)(rows - 1), target_row_ll));
+                marker_at_row[target_row] = (double)tm.timemarkercode ();
+            }
+        }
+        else if (frame_marker_count > 0)
+        {
+            // No frame Start or zero sample_dt: place first marker at row 0.
+            marker_at_row[0] = (double)frame.timemarkers (0).timemarkercode ();
+        }
+
         for (int row = 0; row < rows; row++)
         {
             std::fill (package.begin (), package.end (), 0.0);
@@ -764,8 +743,8 @@ int AntNeuroEdxBoard::process_frames ()
             {
                 double value = frame.matrix ().data (row * cols + col);
                 int channel_index = (col < (int)active_channel_indices.size ()) ?
-                    active_channel_indices[(size_t)col] :
-                    col;
+                        active_channel_indices[(size_t)col] :
+                        col;
 
                 EdigRPC::gen::ChannelPolarity polarity = EdigRPC::gen::ChannelPolarity::Referential;
                 for (const auto &meta : channel_meta)
@@ -804,16 +783,16 @@ int AntNeuroEdxBoard::process_frames ()
                 {
                     non_monotonic_timestamp_count++;
                 }
-                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) >
-                    large_gap_threshold)
+                if ((package[(size_t)timestamp_channel] - last_emitted_timestamp) > large_gap_threshold)
                 {
                     large_gap_count++;
                 }
             }
             last_emitted_timestamp = package[(size_t)timestamp_channel];
-            if (frame.timemarkers_size () > 0)
+            auto it = marker_at_row.find (row);
+            if (it != marker_at_row.end ())
             {
-                package[(size_t)marker_channel] = (double)frame.timemarkers (0).timemarkercode ();
+                insert_marker (it->second, (int)BrainFlowPresets::DEFAULT_PRESET);
             }
             push_package (package.data ());
         }
@@ -850,10 +829,6 @@ int AntNeuroEdxBoard::start_stream (int buffer_size, const char *streamer_params
     large_gap_count = 0;
     fallback_timestamp_count = 0;
     missing_start_frame_count = 0;
-    impedance_payload_values_total = 0;
-    impedance_rows_mapped = 0;
-    impedance_rows_truncated_count = 0;
-    impedance_truncation_logged = false;
     keep_alive = true;
     state = (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
     streaming_thread = std::thread ([this] { read_thread (); });
@@ -956,8 +931,8 @@ int AntNeuroEdxBoard::validate_reference_range (double value)
     {
         return (int)BrainFlowExitCodes::STATUS_OK;
     }
-    return (std::find (reference_ranges_available.begin (), reference_ranges_available.end (),
-                value) != reference_ranges_available.end ()) ?
+    return (std::find (reference_ranges_available.begin (), reference_ranges_available.end (), value) !=
+               reference_ranges_available.end ()) ?
         (int)BrainFlowExitCodes::STATUS_OK :
         (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
 }
@@ -995,6 +970,18 @@ int AntNeuroEdxBoard::parse_edx_command (const std::string &config, std::string 
         out["sampling_rates"] = sampling_rates_available;
         out["active_channels"] = active_channel_indices;
         out["selected_model"] = selected_model;
+        out["reference_ranges"] = reference_ranges_available;
+        out["bipolar_ranges"] = bipolar_ranges_available;
+        json channels = json::array ();
+        for (const auto &meta : channel_meta)
+        {
+            json ch;
+            ch["index"] = meta.index;
+            ch["name"] = meta.name;
+            ch["polarity"] = (int)meta.polarity;
+            channels.push_back (ch);
+        }
+        out["channels"] = channels;
     }
     else if (parts[1] == "get_mode")
     {
@@ -1032,6 +1019,82 @@ int AntNeuroEdxBoard::parse_edx_command (const std::string &config, std::string 
         if (power_response.powerlist_size () > 0)
         {
             out["battery_level"] = power_response.powerlist (0).batterylevel ();
+        }
+    }
+    else if (parts[1] == "trigger_config" && parts.size () >= 3)
+    {
+        // "edx:trigger_config:<ch>,<dutyCycle>,<pulseFreq>,<pulseCount>,<burstFreq>,<burstCount>"
+        std::vector<double> vals;
+        std::stringstream csv (parts[2]);
+        std::string item;
+        while (std::getline (csv, item, ','))
+        {
+            vals.push_back (std::stod (item));
+        }
+        if (vals.size () < 6)
+        {
+            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+        }
+        EdigRPC::gen::Amplifier_SetOutputTriggerChannelsRequest request;
+        request.set_amplifierhandle (amplifier_handle);
+        auto *info = request.add_infos ();
+        info->set_channelindex ((int)vals[0]);
+        info->set_channeltype (EdigRPC::gen::OutputChannelType_TriggerOutput);
+        auto *params_map = info->mutable_parameters ();
+        (*params_map)["dutyCycle"] = vals[1];
+        (*params_map)["pulseFrequency"] = vals[2];
+        (*params_map)["pulseCount"] = vals[3];
+        (*params_map)["burstFrequency"] = vals[4];
+        (*params_map)["burstCount"] = vals[5];
+        EdigRPC::gen::Amplifier_SetOutputTriggerChannelsResponse resp;
+        grpc::ClientContext ctx;
+        ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status status = stub->Amplifier_SetOutputTriggerChannels (&ctx, request, &resp);
+        if (!status.ok ())
+        {
+            return map_status (status);
+        }
+        out["channel"] = (int)vals[0];
+    }
+    else if (parts[1] == "trigger_start" && parts.size () >= 3)
+    {
+        EdigRPC::gen::Amplifier_StartOutputTriggerRequest request;
+        request.set_amplifierhandle (amplifier_handle);
+        std::stringstream csv (parts[2]);
+        std::string item;
+        while (std::getline (csv, item, ','))
+        {
+            request.add_channels (std::stoi (item));
+        }
+        EdigRPC::gen::Amplifier_StartOutputTriggerResponse resp;
+        grpc::ClientContext ctx;
+        ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status status = stub->Amplifier_StartOutputTrigger (&ctx, request, &resp);
+        if (!status.ok ())
+        {
+            return map_status (status);
+        }
+    }
+    else if (parts[1] == "trigger_stop" && parts.size () >= 3)
+    {
+        EdigRPC::gen::Amplifier_StopOutputTriggerRequest request;
+        request.set_amplifierhandle (amplifier_handle);
+        std::stringstream csv (parts[2]);
+        std::string item;
+        while (std::getline (csv, item, ','))
+        {
+            request.add_channels (std::stoi (item));
+        }
+        EdigRPC::gen::Amplifier_StopOutputTriggerResponse resp;
+        grpc::ClientContext ctx;
+        ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status status = stub->Amplifier_StopOutputTrigger (&ctx, request, &resp);
+        if (!status.ok ())
+        {
+            return map_status (status);
         }
     }
     else
@@ -1093,8 +1156,12 @@ int AntNeuroEdxBoard::config_board (std::string config, std::string &response)
         {
             return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
         }
+        if (impedance_mode == mode)
+        {
+            return (int)BrainFlowExitCodes::STATUS_OK;
+        }
         impedance_mode = mode;
-        return (int)BrainFlowExitCodes::STATUS_OK;
+        return apply_mode_change ();
     }
     if (config == "get_info")
     {
@@ -1105,14 +1172,14 @@ int AntNeuroEdxBoard::config_board (std::string config, std::string &response)
         info["selected_model"] = selected_model;
         info["selected_key"] = selected_device_key;
         info["selected_serial"] = selected_device_serial;
-        info["timing"] = {{"missing_start_frame_count", missing_start_frame_count},
+        info["impedance_mode"] = impedance_mode;
+        info["impedance_sample_count"] = impedance_sample_count;
+        info["timing"] = {
+            {"missing_start_frame_count", missing_start_frame_count},
             {"fallback_timestamp_count", fallback_timestamp_count},
             {"non_monotonic_timestamp_count", non_monotonic_timestamp_count},
             {"large_gap_count", large_gap_count},
             {"last_emitted_timestamp", last_emitted_timestamp}};
-        info["impedance"] = {{"impedance_payload_values_total", impedance_payload_values_total},
-            {"impedance_rows_mapped", impedance_rows_mapped},
-            {"impedance_rows_truncated_count", impedance_rows_truncated_count}};
         response = info.dump ();
         return (int)BrainFlowExitCodes::STATUS_OK;
     }
