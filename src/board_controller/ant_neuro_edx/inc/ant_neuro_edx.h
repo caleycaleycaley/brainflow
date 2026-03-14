@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
@@ -15,6 +16,18 @@
 
 #include "EdigRPC.grpc.pb.h"
 #endif
+
+
+// Mode-change requests processed by the read_thread between gRPC frames.
+// The read_thread is the only safe place to call Amplifier_SetMode because the
+// EDX gRPC server corrupts its internal state if SetMode races with GetFrame.
+enum class EdxModeRequest : int
+{
+    None = 0,       // No pending request
+    Idle = 1,       // Transition to idle mode
+    Eeg = 2,        // Transition to EEG streaming mode
+    Impedance = 3   // Transition to impedance mode
+};
 
 
 class AntNeuroEdxBoard : public Board
@@ -36,6 +49,15 @@ private:
     std::mutex wait_mutex;
     std::condition_variable wait_cv;
     volatile int state;
+
+    // Atomic mode-change state machine.
+    // Callers set mode_request, the read_thread processes it between frames
+    // and writes the result to mode_result, then notifies via mode_cv.
+    std::atomic<EdxModeRequest> mode_request;
+    std::atomic<int> mode_result;
+    std::mutex mode_mutex;
+    std::condition_variable mode_cv;
+
     int amplifier_handle;
     int requested_master_board;
     int package_num;
@@ -54,6 +76,7 @@ private:
     double last_emitted_timestamp;
     uint64_t impedance_sample_count;
 #ifdef BUILD_ANT_EDX
+    grpc::ClientContext *volatile streaming_context;
     std::shared_ptr<grpc::Channel> grpc_channel;
     std::unique_ptr<EdigRPC::gen::EdigRPC::Stub> stub;
     std::vector<EdxChannelMeta> channel_meta;
@@ -74,6 +97,8 @@ private:
     int apply_mode_change ();
     int parse_edx_command (const std::string &config, std::string &response);
     void read_thread ();
+    int request_mode_from_thread (EdxModeRequest request);
+    void process_mode_request ();
     bool parse_bool_flag (const std::string &value, bool &flag);
 #ifdef BUILD_ANT_EDX
     int connect_and_create_device ();

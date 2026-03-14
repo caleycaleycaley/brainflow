@@ -92,6 +92,8 @@ int map_status (const grpc::Status &status)
     {
         return (int)BrainFlowExitCodes::STATUS_OK;
     }
+    spdlog::get ("board_logger")->error ("gRPC error: code={} message='{}' details='{}'",
+        (int)status.error_code (), status.error_message (), status.error_details ());
     if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
     {
         return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
@@ -136,6 +138,11 @@ AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params) : Board 
     large_gap_count = 0;
     last_emitted_timestamp = -1.0;
     impedance_sample_count = 0;
+    mode_request.store (EdxModeRequest::None);
+    mode_result.store ((int)BrainFlowExitCodes::STATUS_OK);
+#ifdef BUILD_ANT_EDX
+    streaming_context = nullptr;
+#endif
 }
 
 AntNeuroEdxBoard::~AntNeuroEdxBoard ()
@@ -581,6 +588,11 @@ void AntNeuroEdxBoard::read_thread ()
 
     while (keep_alive)
     {
+        // Process any pending mode-change request between frames.
+        // This is the ONLY safe place to call Amplifier_SetMode — the EDX
+        // gRPC server corrupts its state if SetMode races with GetFrame.
+        process_mode_request ();
+
         int res = process_frames ();
         if (res == (int)BrainFlowExitCodes::STATUS_OK)
         {
@@ -609,6 +621,44 @@ void AntNeuroEdxBoard::read_thread ()
             std::this_thread::sleep_for (std::chrono::milliseconds (sleep_time_ms));
         }
     }
+
+    // Handle any pending request on exit
+    process_mode_request ();
+}
+
+void AntNeuroEdxBoard::process_mode_request ()
+{
+    EdxModeRequest req = mode_request.load ();
+    if (req == EdxModeRequest::None)
+    {
+        return;
+    }
+
+    int res;
+    switch (req)
+    {
+        case EdxModeRequest::Idle:
+            res = set_idle_mode ();
+            break;
+        case EdxModeRequest::Eeg:
+            impedance_mode = false;
+            res = set_mode ();
+            break;
+        case EdxModeRequest::Impedance:
+            impedance_mode = true;
+            res = set_mode ();
+            break;
+        default:
+            res = (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+            break;
+    }
+
+    {
+        std::lock_guard<std::mutex> lk (mode_mutex);
+        mode_result.store (res);
+        mode_request.store (EdxModeRequest::None);
+    }
+    mode_cv.notify_one ();
 }
 
 int AntNeuroEdxBoard::process_frames ()
@@ -622,7 +672,9 @@ int AntNeuroEdxBoard::process_frames ()
     // premature DEADLINE_EXCEEDED that masks valid settling-time delays.
     int deadline_ms = impedance_mode ? 3000 : 500;
     ctx.set_deadline (std::chrono::system_clock::now () + std::chrono::milliseconds (deadline_ms));
+    streaming_context = &ctx;
     grpc::Status status = stub->Amplifier_GetFrame (&ctx, request, &response);
+    streaming_context = nullptr;
     if (!status.ok ())
     {
         return map_status (status);
@@ -858,11 +910,67 @@ int AntNeuroEdxBoard::start_stream (int buffer_size, const char *streamer_params
     return (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
 }
 
+// Request a mode change from the read_thread, which processes it between
+// Amplifier_GetFrame calls where the gRPC server state is clean.
+// If the thread is not running, calls the mode function directly.
+// Waits up to timeout seconds for the thread to process the request.
+int AntNeuroEdxBoard::request_mode_from_thread (EdxModeRequest req)
+{
+    if (!keep_alive)
+    {
+        // Thread not running — call directly (no race possible)
+        switch (req)
+        {
+            case EdxModeRequest::Idle:
+                return set_idle_mode ();
+            case EdxModeRequest::Eeg:
+                impedance_mode = false;
+                return set_mode ();
+            case EdxModeRequest::Impedance:
+                impedance_mode = true;
+                return set_mode ();
+            default:
+                return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+        }
+    }
+
+    // Post the request for the read_thread
+    mode_request.store (req);
+
+    // Wait for the thread to process it
+    std::unique_lock<std::mutex> lk (mode_mutex);
+    auto deadline = std::chrono::seconds (std::max (2, params.timeout));
+    if (mode_cv.wait_for (lk, deadline,
+            [this] { return mode_request.load () == EdxModeRequest::None; }))
+    {
+        return mode_result.load ();
+    }
+
+    safe_logger (spdlog::level::warn, "EDX mode change request timed out");
+    mode_request.store (EdxModeRequest::None);
+    return (int)BrainFlowExitCodes::GENERAL_ERROR;
+}
+
 int AntNeuroEdxBoard::stop_stream ()
 {
     if (!is_streaming && !keep_alive)
     {
         return (int)BrainFlowExitCodes::STREAM_THREAD_IS_NOT_RUNNING;
+    }
+
+    // Request idle mode via the read_thread state machine.
+    // The thread processes it between GetFrame calls where the gRPC server
+    // state is clean.  If it fails (server already broken from sample loss),
+    // cancel the in-flight GetFrame so the thread can exit promptly.
+    int idle_res = request_mode_from_thread (EdxModeRequest::Idle);
+    if (idle_res != (int)BrainFlowExitCodes::STATUS_OK)
+    {
+        safe_logger (spdlog::level::warn,
+            "EDX set_idle via thread failed ({}), cancelling in-flight GetFrame", idle_res);
+        if (streaming_context != nullptr)
+        {
+            streaming_context->TryCancel ();
+        }
     }
 
     keep_alive = false;
@@ -871,7 +979,6 @@ int AntNeuroEdxBoard::stop_stream ()
     {
         streaming_thread.join ();
     }
-    set_idle_mode ();
     return (int)BrainFlowExitCodes::STATUS_OK;
 }
 
@@ -882,16 +989,73 @@ int AntNeuroEdxBoard::release_session ()
         stop_stream ();
     }
 
-    set_idle_mode ();
-    if (stub && amplifier_handle >= 0)
+    // Try to set idle and dispose with the current handle.
+    int old_handle = amplifier_handle;
+    int idle_res = set_idle_mode ();
+    bool disposed = false;
+
+    if (idle_res == (int)BrainFlowExitCodes::STATUS_OK && stub && amplifier_handle >= 0)
     {
+        // Handle is good — dispose normally
         EdigRPC::gen::Amplifier_DisposeRequest request;
         request.set_amplifierhandle (amplifier_handle);
         EdigRPC::gen::Amplifier_DisposeResponse response;
         grpc::ClientContext ctx;
         ctx.set_deadline (std::chrono::system_clock::now () +
             std::chrono::seconds (std::max (1, params.timeout)));
-        stub->Amplifier_Dispose (&ctx, request, &response);
+        grpc::Status s = stub->Amplifier_Dispose (&ctx, request, &response);
+        disposed = s.ok ();
+    }
+
+    if (!disposed && stub && old_handle >= 0)
+    {
+        // set_idle failed (server state corrupted, e.g. after sample loss).
+        // Try dispose directly on the old handle without idle — the server
+        // may still accept dispose even when SetMode fails.
+        spdlog::get ("board_logger")->warn (
+            "EDX set_idle failed ({}), trying dispose directly on handle {}", idle_res, old_handle);
+        EdigRPC::gen::Amplifier_DisposeRequest request;
+        request.set_amplifierhandle (old_handle);
+        EdigRPC::gen::Amplifier_DisposeResponse response;
+        grpc::ClientContext ctx;
+        ctx.set_deadline (std::chrono::system_clock::now () +
+            std::chrono::seconds (std::max (1, params.timeout)));
+        grpc::Status s = stub->Amplifier_Dispose (&ctx, request, &response);
+        spdlog::get ("board_logger")->info (
+            "EDX direct dispose ok={} msg={}", s.ok (), s.error_message ());
+        disposed = s.ok ();
+    }
+
+    if (!disposed && old_handle >= 0)
+    {
+        // Both idle and dispose failed on the old connection.
+        // Open a fresh gRPC channel and try dispose with the OLD handle number.
+        // Do NOT call connect_and_create_device — the server still holds the
+        // old handle and would reject "Amplifier in use".
+        spdlog::get ("board_logger")->warn (
+            "EDX direct dispose failed, trying fresh gRPC connection with old handle {}", old_handle);
+        stub.reset ();
+        grpc_channel.reset ();
+
+        int conn_res = ensure_connected ();
+        if (conn_res == (int)BrainFlowExitCodes::STATUS_OK)
+        {
+            // Try dispose with old handle on fresh connection
+            EdigRPC::gen::Amplifier_DisposeRequest request;
+            request.set_amplifierhandle (old_handle);
+            EdigRPC::gen::Amplifier_DisposeResponse response;
+            grpc::ClientContext ctx;
+            ctx.set_deadline (std::chrono::system_clock::now () +
+                std::chrono::seconds (std::max (1, params.timeout)));
+            grpc::Status s = stub->Amplifier_Dispose (&ctx, request, &response);
+            spdlog::get ("board_logger")->info (
+                "EDX fresh-conn dispose ok={} msg={}", s.ok (), s.error_message ());
+            disposed = s.ok ();
+        }
+        else
+        {
+            spdlog::get ("board_logger")->warn ("EDX recovery: ensure_connected failed = {}", conn_res);
+        }
     }
 
     free_packages ();
