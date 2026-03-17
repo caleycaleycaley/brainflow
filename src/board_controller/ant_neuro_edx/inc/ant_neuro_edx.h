@@ -110,7 +110,7 @@ private:
 #endif
 
 public:
-    AntNeuroEdxBoard (struct BrainFlowInputParams params);
+    AntNeuroEdxBoard (int board_id, struct BrainFlowInputParams params);
     ~AntNeuroEdxBoard ();
 
     int prepare_session () override;

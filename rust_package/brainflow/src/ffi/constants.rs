@@ -32,7 +32,7 @@ impl BoardIds {
     pub const FIRST: BoardIds = BoardIds::PlaybackFileBoard;
 }
 impl BoardIds {
-    pub const LAST: BoardIds = BoardIds::AntNeuroEdxBoard;
+    pub const LAST: BoardIds = BoardIds::AntNeuroEe511EdxBoard;
 }
 #[repr(i32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -103,6 +103,20 @@ pub enum BoardIds {
     Ironbci32Board = 65,
     NeuropawnKnightBoardImu = 66,
     AntNeuroEdxBoard = 67,
+    AntNeuroEe410EdxBoard = 68,
+    AntNeuroEe411EdxBoard = 69,
+    AntNeuroEe430EdxBoard = 70,
+    AntNeuroEe211EdxBoard = 71,
+    AntNeuroEe212EdxBoard = 72,
+    AntNeuroEe213EdxBoard = 73,
+    AntNeuroEe214EdxBoard = 74,
+    AntNeuroEe215EdxBoard = 75,
+    AntNeuroEe221EdxBoard = 76,
+    AntNeuroEe222EdxBoard = 77,
+    AntNeuroEe223EdxBoard = 78,
+    AntNeuroEe224EdxBoard = 79,
+    AntNeuroEe225EdxBoard = 80,
+    AntNeuroEe511EdxBoard = 81,
 }
 #[repr(i32)]
 #[derive(FromPrimitive, ToPrimitive, Debug, Copy, Clone, Hash, PartialEq, Eq)]

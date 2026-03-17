@@ -86,6 +86,20 @@ BrainFlowBoards::BrainFlowBoards()
             {"65", json::object()},
             {"66", json::object()},
             {"67", json::object()},
+            {"68", json::object()},
+            {"69", json::object()},
+            {"70", json::object()},
+            {"71", json::object()},
+            {"72", json::object()},
+            {"73", json::object()},
+            {"74", json::object()},
+            {"75", json::object()},
+            {"76", json::object()},
+            {"77", json::object()},
+            {"78", json::object()},
+            {"79", json::object()},
+            {"80", json::object()},
+            {"81", json::object()},
         }
     }};
 
@@ -1196,6 +1210,29 @@ BrainFlowBoards::BrainFlowBoards()
         {"gnd_resistance_channels", {10}},
         {"other_channels", {67}}
     };
+    auto clone_ant_edx_board = [this] (int edx_board_id, int master_board_id, const char *name)
+    {
+        json descr =
+            brainflow_boards_json["boards"][std::to_string (master_board_id)]["default"];
+        descr["name"] = name;
+        descr.erase ("requires_master_board");
+        descr.erase ("master_board_role");
+        brainflow_boards_json["boards"][std::to_string (edx_board_id)]["default"] = descr;
+    };
+    clone_ant_edx_board (68, 24, "AntNeuroEE410EDX");
+    clone_ant_edx_board (69, 25, "AntNeuroEE411EDX");
+    clone_ant_edx_board (70, 26, "AntNeuroEE430EDX");
+    clone_ant_edx_board (71, 27, "AntNeuroEE211EDX");
+    clone_ant_edx_board (72, 28, "AntNeuroEE212EDX");
+    clone_ant_edx_board (73, 29, "AntNeuroEE213EDX");
+    clone_ant_edx_board (74, 30, "AntNeuroEE214EDX");
+    clone_ant_edx_board (75, 31, "AntNeuroEE215EDX");
+    clone_ant_edx_board (76, 32, "AntNeuroEE221EDX");
+    clone_ant_edx_board (77, 33, "AntNeuroEE222EDX");
+    clone_ant_edx_board (78, 34, "AntNeuroEE223EDX");
+    clone_ant_edx_board (79, 35, "AntNeuroEE224EDX");
+    clone_ant_edx_board (80, 36, "AntNeuroEE225EDX");
+    clone_ant_edx_board (81, 51, "AntNeuroEE511EDX");
 }
 
 BrainFlowBoards boards_struct;

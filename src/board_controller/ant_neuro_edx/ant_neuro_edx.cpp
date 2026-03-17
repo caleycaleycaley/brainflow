@@ -18,13 +18,50 @@ using json = nlohmann::json;
 
 namespace
 {
-constexpr int edx_board_id = (int)BoardIds::ANT_NEURO_EDX_BOARD;
+constexpr int generic_edx_board_id = (int)BoardIds::ANT_NEURO_EDX_BOARD;
 
 bool is_ant_master_board (int board_id)
 {
     return ((board_id >= (int)BoardIds::ANT_NEURO_EE_410_BOARD &&
                board_id <= (int)BoardIds::ANT_NEURO_EE_225_BOARD) ||
         (board_id == (int)BoardIds::ANT_NEURO_EE_511_BOARD));
+}
+
+int explicit_edx_to_master_board (int board_id)
+{
+    switch ((BoardIds)board_id)
+    {
+        case BoardIds::ANT_NEURO_EE_410_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_410_BOARD;
+        case BoardIds::ANT_NEURO_EE_411_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_411_BOARD;
+        case BoardIds::ANT_NEURO_EE_430_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_430_BOARD;
+        case BoardIds::ANT_NEURO_EE_211_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_211_BOARD;
+        case BoardIds::ANT_NEURO_EE_212_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_212_BOARD;
+        case BoardIds::ANT_NEURO_EE_213_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_213_BOARD;
+        case BoardIds::ANT_NEURO_EE_214_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_214_BOARD;
+        case BoardIds::ANT_NEURO_EE_215_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_215_BOARD;
+        case BoardIds::ANT_NEURO_EE_221_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_221_BOARD;
+        case BoardIds::ANT_NEURO_EE_222_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_222_BOARD;
+        case BoardIds::ANT_NEURO_EE_223_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_223_BOARD;
+        case BoardIds::ANT_NEURO_EE_224_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_224_BOARD;
+        case BoardIds::ANT_NEURO_EE_225_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_225_BOARD;
+        case BoardIds::ANT_NEURO_EE_511_EDX_BOARD:
+            return (int)BoardIds::ANT_NEURO_EE_511_BOARD;
+        default:
+            return (int)BoardIds::NO_BOARD;
+    }
 }
 
 std::string to_upper (std::string s)
@@ -116,16 +153,32 @@ std::vector<int> try_get_vec (const json &obj, const char *key)
         return {};
     }
 }
+
+size_t expected_active_channel_count (const json &board_default)
+{
+    std::set<int> channels;
+    const char *keys[] = {"eeg_channels", "emg_channels", "ecg_channels", "eog_channels"};
+    for (const char *key : keys)
+    {
+        for (int channel : try_get_vec (board_default, key))
+        {
+            channels.insert (channel);
+        }
+    }
+    return channels.size ();
+}
 } // namespace
 
-AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params) : Board (edx_board_id, params)
+AntNeuroEdxBoard::AntNeuroEdxBoard (int board_id, struct BrainFlowInputParams params)
+    : Board (board_id, params)
 {
     keep_alive = false;
     initialized = false;
     is_streaming = false;
     state = (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
     amplifier_handle = -1;
-    requested_master_board = params.master_board;
+    requested_master_board =
+        (board_id == generic_edx_board_id) ? params.master_board : explicit_edx_to_master_board (board_id);
     package_num = 0;
     impedance_mode = false;
     sampling_rate = -1;
@@ -153,6 +206,24 @@ AntNeuroEdxBoard::~AntNeuroEdxBoard ()
 
 int AntNeuroEdxBoard::validate_master_board ()
 {
+    if (board_id != generic_edx_board_id)
+    {
+        if (requested_master_board == (int)BoardIds::NO_BOARD)
+        {
+            safe_logger (spdlog::level::err,
+                "failed to map explicit EDX board {} to ANT master board", board_id);
+            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+        }
+        if ((params.master_board != (int)BoardIds::NO_BOARD) &&
+            (params.master_board != requested_master_board))
+        {
+            safe_logger (spdlog::level::err,
+                "explicit EDX board {} conflicts with master_board {} (expected {})",
+                board_id, params.master_board, requested_master_board);
+            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+        }
+        return (int)BrainFlowExitCodes::STATUS_OK;
+    }
     if (!is_ant_master_board (requested_master_board))
     {
         safe_logger (spdlog::level::err, "invalid master_board for EDX: {}", requested_master_board);
@@ -166,7 +237,7 @@ int AntNeuroEdxBoard::ensure_connected ()
     if (!params.other_info.empty () && params.ip_address.empty () && (params.ip_port <= 0))
     {
         safe_logger (spdlog::level::err,
-            "EDX endpoint in other_info is no longer supported for board 67, use ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported, use ip_address/ip_port");
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
 
@@ -185,7 +256,7 @@ int AntNeuroEdxBoard::ensure_connected ()
     if (!params.other_info.empty ())
     {
         safe_logger (spdlog::level::warn,
-            "EDX endpoint in other_info is no longer supported for board 67, use ip_address/ip_port");
+            "EDX endpoint in other_info is no longer supported, use ip_address/ip_port");
     }
 
     if ((params.ip_address.find ("://") != std::string::npos) ||
@@ -410,10 +481,10 @@ int AntNeuroEdxBoard::prepare_session ()
 
     try
     {
-        // EDX is a transport board; the public row layout still comes from the
-        // selected legacy ANT master board descriptor.
+        int descr_board_id =
+            (board_id == generic_edx_board_id) ? requested_master_board : board_id;
         board_descr =
-            boards_struct.brainflow_boards_json["boards"][std::to_string (requested_master_board)];
+            boards_struct.brainflow_boards_json["boards"][std::to_string (descr_board_id)];
         sampling_rate = board_descr["default"]["sampling_rate"];
     }
     catch (...)
@@ -432,8 +503,38 @@ int AntNeuroEdxBoard::prepare_session ()
         release_session ();
         return res;
     }
-    // Device-discovered capabilities refine validation and configuration, but
-    // they do not replace the descriptor shape derived from requested_master_board.
+    size_t expected_channels = expected_active_channel_count (board_descr["default"]);
+    if (expected_channels > 0 && expected_channels != active_channel_indices.size ())
+    {
+        safe_logger (spdlog::level::err,
+            "EDX board {} expected {} active EXG channels from descriptor but device reports {}",
+            board_id, expected_channels, active_channel_indices.size ());
+        release_session ();
+        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+    }
+    int expected_rate = board_descr["default"]["sampling_rate"];
+    if (!sampling_rates_available.empty () &&
+        std::find (sampling_rates_available.begin (), sampling_rates_available.end (), expected_rate) ==
+            sampling_rates_available.end ())
+    {
+        std::ostringstream rates_stream;
+        for (size_t i = 0; i < sampling_rates_available.size (); i++)
+        {
+            if (i > 0)
+            {
+                rates_stream << ", ";
+            }
+            rates_stream << sampling_rates_available[i];
+        }
+        safe_logger (spdlog::level::err,
+            "EDX board {} expected sampling rate {} but device supports [{}]",
+            board_id, expected_rate, rates_stream.str ());
+        release_session ();
+        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+    }
+    // Device-discovered capabilities refine validation and configuration.
+    // Generic board 67 derives its public descriptor from master_board, while
+    // explicit EDX board ids are self-describing.
 
     initialized = true;
     return (int)BrainFlowExitCodes::STATUS_OK;
@@ -1358,8 +1459,8 @@ int AntNeuroEdxBoard::config_board (std::string config, std::string &response)
 
 #include "brainflow_constants.h"
 
-AntNeuroEdxBoard::AntNeuroEdxBoard (struct BrainFlowInputParams params)
-    : Board ((int)BoardIds::ANT_NEURO_EDX_BOARD, params)
+AntNeuroEdxBoard::AntNeuroEdxBoard (int board_id, struct BrainFlowInputParams params)
+    : Board (board_id, params)
 {
 }
 

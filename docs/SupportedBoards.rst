@@ -1155,13 +1155,36 @@ EDX is a transport board that exposes ANT Neuro amplifiers through an external g
 
 Use board id:
 
+- explicit self-describing EDX ids for known amplifiers:
+
+  - :code:`BoardIds.ANT_NEURO_EE_410_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_411_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_430_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_211_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_212_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_213_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_214_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_215_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_221_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_222_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_223_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_224_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_225_EDX_BOARD`
+  - :code:`BoardIds.ANT_NEURO_EE_511_EDX_BOARD`
 - :code:`BoardIds.ANT_NEURO_EDX_BOARD`
+
+Use one of the explicit EDX ids when you know the amplifier model. Keep
+:code:`BoardIds.ANT_NEURO_EDX_BOARD` as the generic joker path for future or
+not-yet-modeled ANT boards.
 
 Required BrainFlowInputParams fields:
 
-- :code:`master_board`, descriptor source board id (for example :code:`BoardIds.ANT_NEURO_EE_511_BOARD`)
 - :code:`ip_address`, EDX service host (for example :code:`localhost`)
 - :code:`ip_port`, EDX service port (for example :code:`3390`)
+
+Additional requirement for the generic board 67 path only:
+
+- :code:`master_board`, descriptor source board id (for example :code:`BoardIds.ANT_NEURO_EE_511_BOARD`)
 
 Optional fields:
 
@@ -1170,11 +1193,22 @@ Optional fields:
 
 Important notes:
 
+- Explicit EDX ids are self-describing and do not require :code:`master_board`.
 - Runtime data layout for board 67 is always derived from :code:`master_board`.
 - Device-discovered capabilities such as rates, ranges and impedance support refine validation and configuration, but do not silently replace the public descriptor layout.
 - :code:`other_info` endpoint format (for example :code:`localhost:3390`) is not supported for board 67.
 
 Initialization example (Python):
+
+.. code-block:: python
+
+    params = BrainFlowInputParams()
+    params.ip_address = "localhost"
+    params.ip_port = 3390
+    params.ip_protocol = IpProtocolTypes.EDX
+    board = BoardShim(BoardIds.ANT_NEURO_EE_511_EDX_BOARD, params)
+
+Generic joker path example (Python):
 
 .. code-block:: python
 
@@ -1190,23 +1224,21 @@ Initialization example (C++):
 .. code-block:: cpp
 
     BrainFlowInputParams params;
-    params.master_board = (int)BoardIds::ANT_NEURO_EE_511_BOARD;
     params.ip_address = "localhost";
     params.ip_port = 3390;
     params.ip_protocol = (int)IpProtocolTypes::EDX;
-    BoardShim board ((int)BoardIds::ANT_NEURO_EDX_BOARD, params);
+    BoardShim board ((int)BoardIds::ANT_NEURO_EE_511_EDX_BOARD, params);
 
 Initialization example (Rust):
 
 .. code-block:: rust
 
     let params = BrainFlowInputParamsBuilder::default()
-        .master_board(BoardIds::AntNeuroEe511Board)
         .ip_address("localhost")
         .ip_port(3390)
         .ip_protocol(IpProtocolTypes::Edx)
         .build();
-    let board = BoardShim::new(BoardIds::AntNeuroEdxBoard, params)?;
+    let board = BoardShim::new(BoardIds::AntNeuroEe511EdxBoard, params)?;
 
 Enophone
 ---------

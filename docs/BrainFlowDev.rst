@@ -58,8 +58,9 @@ Instructions to add new boards to BrainFlow
 - if you maintain Conan packaging, gate optional dependencies behind a Conan option (for example :code:`ant_edx`) instead of adding them to default builds.
 - for EDX transport builds on Windows, use :code:`-DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic` and provide gRPC/protobuf via your toolchain (for example vcpkg).
 - for EDX transport builds on Linux, enable :code:`-DBUILD_ANT_EDX=ON` and ensure :code:`protoc`, gRPC and protobuf development packages are available.
+- for explicit ANT Neuro EDX board ids, keep descriptors self-describing so :code:`master_board` is not required for known amplifier layouts.
 - for :code:`ANT_NEURO_EDX_BOARD (67)`, require :code:`master_board` and endpoint via :code:`ip_address`/:code:`ip_port`; do not use :code:`other_info` for endpoint.
-- for :code:`ANT_NEURO_EDX_BOARD (67)`, keep runtime data shape derived from :code:`master_board` for cross-binding compatibility.
+- for :code:`ANT_NEURO_EDX_BOARD (67)`, keep runtime data shape derived from :code:`master_board` so it can remain the generic joker path for future boards.
 - create a PR
 
 **You've just written Python, Java, C#, R, C++ ... SDKs for your board! Also, now you can use your new board with applications and frameworks built on top of BrainFlow API.**

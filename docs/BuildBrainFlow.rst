@@ -245,12 +245,13 @@ Windows
         cmake -G "Visual Studio 17 2022" -A x64 -DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic -DCMAKE_INSTALL_PREFIX=../installed-edx ..
         cmake --build . --target install --config Release -j 2 --parallel 2
 
-    Runtime contract for :code:`ANT_NEURO_EDX_BOARD (67)`:
+    Runtime contract for ANT Neuro EDX boards:
 
-    - :code:`master_board` is required.
+    - Explicit EDX board ids are self-describing and do not require :code:`master_board`.
+    - :code:`ANT_NEURO_EDX_BOARD (67)` remains the generic joker path and requires :code:`master_board`.
     - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
     - :code:`other_info` is not supported for EDX endpoint configuration.
-    - Runtime row layout is derived from :code:`master_board`.
+    - For board :code:`67`, runtime row layout is derived from :code:`master_board`.
 
 
 Linux
@@ -286,12 +287,13 @@ Linux
         make
         make install
 
-    Runtime contract for :code:`ANT_NEURO_EDX_BOARD (67)`:
+    Runtime contract for ANT Neuro EDX boards:
 
-    - :code:`master_board` is required.
+    - Explicit EDX board ids are self-describing and do not require :code:`master_board`.
+    - :code:`ANT_NEURO_EDX_BOARD (67)` remains the generic joker path and requires :code:`master_board`.
     - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
     - :code:`other_info` is not supported for EDX endpoint configuration.
-    - Runtime row layout is derived from :code:`master_board`.
+    - For board :code:`67`, runtime row layout is derived from :code:`master_board`.
 
 MacOS
 ~~~~~~~
