@@ -87,7 +87,6 @@ SET (BOARD_CONTROLLER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/neuropawn/knight_base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/neuropawn/knight_imu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/biolistener/biolistener.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ant_neuro_edx/ant_neuro_edx.cpp
 )
 
 if (BUILD_ANT_EDX)
@@ -122,6 +121,7 @@ if (BUILD_ANT_EDX)
     )
 
     set (BOARD_CONTROLLER_SRC ${BOARD_CONTROLLER_SRC}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ant_neuro_edx/ant_neuro_edx.cpp
         ${ANT_EDX_PROTO_SRCS}
         ${ANT_EDX_GRPC_SRCS}
     )
