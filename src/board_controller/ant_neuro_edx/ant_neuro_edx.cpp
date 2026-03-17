@@ -129,7 +129,7 @@ int map_status (const grpc::Status &status)
     {
         return (int)BrainFlowExitCodes::STATUS_OK;
     }
-    safe_logger (spdlog::level::err, "gRPC error: code={} message='{}' details='{}'",
+    Board::board_logger->error ("gRPC error: code={} message='{}' details='{}'",
         (int)status.error_code (), status.error_message (), status.error_details ());
     if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
     {
