@@ -92,7 +92,7 @@ int map_status (const grpc::Status &status)
     {
         return (int)BrainFlowExitCodes::STATUS_OK;
     }
-    spdlog::get ("board_logger")->error ("gRPC error: code={} message='{}' details='{}'",
+    safe_logger (spdlog::level::err, "gRPC error: code={} message='{}' details='{}'",
         (int)status.error_code (), status.error_message (), status.error_details ());
     if (status.error_code () == grpc::StatusCode::DEADLINE_EXCEEDED)
     {
@@ -1012,7 +1012,7 @@ int AntNeuroEdxBoard::release_session ()
         // set_idle failed (server state corrupted, e.g. after sample loss).
         // Try dispose directly on the old handle without idle — the server
         // may still accept dispose even when SetMode fails.
-        spdlog::get ("board_logger")->warn (
+        safe_logger (spdlog::level::warn,
             "EDX set_idle failed ({}), trying dispose directly on handle {}", idle_res, old_handle);
         EdigRPC::gen::Amplifier_DisposeRequest request;
         request.set_amplifierhandle (old_handle);
@@ -1021,7 +1021,7 @@ int AntNeuroEdxBoard::release_session ()
         ctx.set_deadline (std::chrono::system_clock::now () +
             std::chrono::seconds (std::max (1, params.timeout)));
         grpc::Status s = stub->Amplifier_Dispose (&ctx, request, &response);
-        spdlog::get ("board_logger")->info (
+        safe_logger (spdlog::level::info,
             "EDX direct dispose ok={} msg={}", s.ok (), s.error_message ());
         disposed = s.ok ();
     }
@@ -1032,7 +1032,7 @@ int AntNeuroEdxBoard::release_session ()
         // Open a fresh gRPC channel and try dispose with the OLD handle number.
         // Do NOT call connect_and_create_device — the server still holds the
         // old handle and would reject "Amplifier in use".
-        spdlog::get ("board_logger")->warn (
+        safe_logger (spdlog::level::warn,
             "EDX direct dispose failed, trying fresh gRPC connection with old handle {}", old_handle);
         stub.reset ();
         grpc_channel.reset ();
@@ -1048,13 +1048,13 @@ int AntNeuroEdxBoard::release_session ()
             ctx.set_deadline (std::chrono::system_clock::now () +
                 std::chrono::seconds (std::max (1, params.timeout)));
             grpc::Status s = stub->Amplifier_Dispose (&ctx, request, &response);
-            spdlog::get ("board_logger")->info (
+            safe_logger (spdlog::level::info,
                 "EDX fresh-conn dispose ok={} msg={}", s.ok (), s.error_message ());
             disposed = s.ok ();
         }
         else
         {
-            spdlog::get ("board_logger")->warn ("EDX recovery: ensure_connected failed = {}", conn_res);
+            safe_logger (spdlog::level::warn, "EDX recovery: ensure_connected failed = {}", conn_res);
         }
     }
 
