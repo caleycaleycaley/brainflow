@@ -24,7 +24,7 @@ jobs:
     - name: Get Conan
       uses: turtlebrowser/get-conan@main
       with:
-        version: 1.66.0
+        version: 1.50.0 
     - name: Set Version
       id: version
       run: if ("tag" -eq $Env:GITHUB_REF_TYPE) { echo "::set-output name=version::$Env:GITHUB_REF_NAME" } else { echo "::set-output name=version::$Env:GITHUB_SHA" }
@@ -42,9 +42,3 @@ jobs:
       shell: cmd
       env:
         CONAN_CMAKE_SYSTEM_VERSION: 10.0.19041.0 
-    - name: Run Conan packaging (EDX profile)
-      run: |
-        conan create . demo/testing -o ant_edx=True -o static_msvc_runtime=False --build=missing
-      shell: cmd
-      env:
-        CONAN_CMAKE_SYSTEM_VERSION: 10.0.19041.0
