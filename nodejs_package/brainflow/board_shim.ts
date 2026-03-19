@@ -162,31 +162,13 @@ export class BoardShim
 
     private inputJson: string;
 
-    private static requiresMasterBoard(boardId: BoardIds): boolean
-    {
-        const boardDescr = BoardShim.getBoardDescr(boardId);
-        return !!boardDescr.requires_master_board;
-    }
-
     constructor(boardId: BoardIds, inputParams: Partial<IBrainFlowInputParams>)
     {
         this.boardId = boardId;
-        const hasMasterBoard =
-            inputParams.masterBoard !== undefined && inputParams.masterBoard !== null;
-        const requiresMasterBoard = BoardShim.requiresMasterBoard(boardId);
-        if (requiresMasterBoard && (!hasMasterBoard || inputParams.masterBoard === BoardIds.NO_BOARD))
-        {
-            throw new BrainFlowError (
-                BrainFlowExitCodes.INVALID_ARGUMENTS_ERROR,
-                'You need to provide master board id for boards with derived runtime layout',
-            );
-        }
         this.masterBoardId =
-            (requiresMasterBoard &&
-                hasMasterBoard &&
-                inputParams.masterBoard !== BoardIds.NO_BOARD) ?
-                (inputParams.masterBoard as BoardIds) :
-                boardId;
+            inputParams.masterBoard && inputParams.masterBoard !== BoardIds.NO_BOARD ?
+            inputParams.masterBoard :
+            boardId;
         this.inputJson = new BrainFlowInputParams (inputParams).toJson();
     }
 
