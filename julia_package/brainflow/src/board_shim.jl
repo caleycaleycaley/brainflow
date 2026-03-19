@@ -68,7 +68,6 @@ export BrainFlowInputParams
     BIOLISTENER_BOARD = 64
     IRONBCI_32_BOARD = 65
     NEUROPAWN_KNIGHT_BOARD_IMU = 66
-    ANT_NEURO_EDX_BOARD = 67
     ANT_NEURO_EE_410_EDX_BOARD = 68
     ANT_NEURO_EE_411_EDX_BOARD = 69
     ANT_NEURO_EE_430_EDX_BOARD = 70
@@ -245,9 +244,9 @@ struct BoardShim
 
     function BoardShim(id::Integer, params::BrainFlowInputParams)
         master_id = id
-        if get(get_board_descr(id), "requires_master_board", false)
+        if (id == Integer(STREAMING_BOARD) || id == Integer(PLAYBACK_FILE_BOARD))
             if Integer(params.master_board) == Integer(NO_BOARD)
-                throw(BrainFlowError("master board id is required for boards with derived runtime layout",
+                throw(BrainFlowError("master board id is required for streaming or playback boards",
                                      Integer(INVALID_ARGUMENTS_ERROR)))
             end
             master_id = Integer(params.master_board)

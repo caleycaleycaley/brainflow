@@ -16,15 +16,6 @@ use crate::ffi::board_controller;
 
 const MAX_CHANNELS: usize = 512;
 
-fn requires_master_board(board_id: BoardIds) -> Result<bool> {
-    let board_descr = get_board_descr(board_id, BrainFlowPresets::DefaultPreset)?;
-    let board_descr: serde_json::Value = serde_json::from_str(&board_descr)?;
-    Ok(board_descr
-        .get("requires_master_board")
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false))
-}
-
 /// BoardShim is a primary interface to all boards
 pub struct BoardShim {
     board_id: BoardIds,
@@ -38,7 +29,7 @@ impl BoardShim {
         let json_brainflow_input_params = serde_json::to_string(&input_params)?;
         let json_brainflow_input_params = CString::new(json_brainflow_input_params)?;
         let master_board_id =
-            if requires_master_board(board_id)? {
+            if let BoardIds::StreamingBoard | BoardIds::PlaybackFileBoard = board_id {
                 let master_board_raw = *input_params.master_board();
                 if master_board_raw == BoardIds::NoBoard as usize {
                     return Err(crate::BrainFlowError::InvalidArgumentsError.into());

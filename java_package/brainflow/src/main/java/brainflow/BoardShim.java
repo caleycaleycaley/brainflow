@@ -19,12 +19,6 @@ import com.sun.jna.Native;
 @SuppressWarnings ("deprecation")
 public class BoardShim
 {
-    private static boolean requires_master_board (int board_id) throws BrainFlowError
-    {
-        JsonObject descr = get_board_descr (JsonObject.class, board_id);
-        return descr.has ("requires_master_board") && descr.get ("requires_master_board").getAsBoolean ();
-    }
-
     private interface DllInterface extends Library
     {
         int prepare_session (int board_id, String params);
@@ -1303,12 +1297,14 @@ public class BoardShim
     {
         this.board_id = board_id;
         this.master_board_id = board_id;
-        if (requires_master_board (board_id))
+        if (
+            (board_id == BoardIds.STREAMING_BOARD.get_code ()) || (board_id == BoardIds.PLAYBACK_FILE_BOARD.get_code ())
+        )
         {
             if (params.get_master_board () == BoardIds.NO_BOARD.get_code ())
             {
                 throw new BrainFlowError (
-                        "need to set master board attribute in BrainFlowInputParams for boards with derived runtime layout",
+                        "need to set master board attribute in BrainFlowInputParams",
                         BrainFlowExitCode.INVALID_ARGUMENTS_ERROR.get_code ());
             } else
             {
@@ -1326,12 +1322,15 @@ public class BoardShim
     {
         this.board_id = board_id.get_code ();
         this.master_board_id = board_id.get_code ();
-        if (requires_master_board (board_id.get_code ()))
+        if (
+            (board_id.get_code () == BoardIds.STREAMING_BOARD.get_code ())
+                    || (board_id.get_code () == BoardIds.PLAYBACK_FILE_BOARD.get_code ())
+        )
         {
             if (params.get_master_board () == BoardIds.NO_BOARD.get_code ())
             {
                 throw new BrainFlowError (
-                        "need to set master board attribute in BrainFlowInputParams for boards with derived runtime layout",
+                        "need to set master board attribute in BrainFlowInputParams",
                         BrainFlowExitCode.INVALID_ARGUMENTS_ERROR.get_code ());
             } else
             {

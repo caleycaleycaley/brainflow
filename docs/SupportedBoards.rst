@@ -1188,7 +1188,6 @@ Important notes:
 
 - Explicit EDX ids are self-describing and do not require :code:`master_board`.
 - Available sampling rates and signal ranges are discovered from the amplifier at runtime via :code:`board.config_board("edx:get_capabilities")`.
-- BrainFlow also exposes :code:`BoardIds.ANT_NEURO_EDX_BOARD` as a generic wrapper path, but it still requires :code:`master_board`, so the direct EDX ids above are the preferred user-facing option.
 
 Available commands:
 

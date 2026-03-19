@@ -104,30 +104,12 @@ BrainFlowBoards::BrainFlowBoards()
     }};
 
     // available presets are: default, auxiliary, ancillary, default is required, other presets are optional
-    brainflow_boards_json["boards"]["-3"]["default"] = {
-        {"name", "PlayBack"},
-        {"requires_master_board", true},
-        {"master_board_role", "descriptor_source"}};
-    brainflow_boards_json["boards"]["-3"]["auxiliary"] = {
-        {"name", "PlayBack"},
-        {"requires_master_board", true},
-        {"master_board_role", "descriptor_source"}};
-    brainflow_boards_json["boards"]["-3"]["ancillary"] = {
-        {"name", "PlayBack"},
-        {"requires_master_board", true},
-        {"master_board_role", "descriptor_source"}};
-    brainflow_boards_json["boards"]["-2"]["default"] = {
-        {"name", "Streaming"},
-        {"requires_master_board", true},
-        {"master_board_role", "descriptor_source"}};
-    brainflow_boards_json["boards"]["-2"]["auxiliary"] = {
-        {"name", "Streaming"},
-        {"requires_master_board", true},
-        {"master_board_role", "descriptor_source"}};
-    brainflow_boards_json["boards"]["-2"]["ancillary"] = {
-        {"name", "Streaming"},
-        {"requires_master_board", true},
-        {"master_board_role", "descriptor_source"}};
+    brainflow_boards_json["boards"]["-3"]["default"] = {{"name", "PlayBack"}};
+    brainflow_boards_json["boards"]["-3"]["auxiliary"] = {{"name", "PlayBack"}};
+    brainflow_boards_json["boards"]["-3"]["ancillary"] = {{"name", "PlayBack"}};
+    brainflow_boards_json["boards"]["-2"]["default"] = {{"name", "Streaming"}};
+    brainflow_boards_json["boards"]["-2"]["auxiliary"] = {{"name", "Streaming"}};
+    brainflow_boards_json["boards"]["-2"]["ancillary"] = {{"name", "Streaming"}};
     brainflow_boards_json["boards"]["-1"]["default"] =
     {
         {"name", "Synthetic"},
@@ -1194,29 +1176,11 @@ BrainFlowBoards::BrainFlowBoards()
         {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
         {"other_channels", {9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19}}
     };
-    brainflow_boards_json["boards"]["67"]["default"] =
-    {
-        {"name", "AntNeuroEDX"},
-        {"requires_master_board", true},
-        {"master_board_role", "descriptor_source"},
-        {"sampling_rate", 2000},
-        {"timestamp_channel", 68},
-        {"marker_channel", 69},
-        {"package_num_channel", 0},
-        {"num_rows", 70},
-        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
-        {"resistance_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
-        {"ref_resistance_channels", {9}},
-        {"gnd_resistance_channels", {10}},
-        {"other_channels", {67}}
-    };
     auto clone_ant_edx_board = [this] (int edx_board_id, int master_board_id, const char *name)
     {
         json descr =
             brainflow_boards_json["boards"][std::to_string (master_board_id)]["default"];
         descr["name"] = name;
-        descr.erase ("requires_master_board");
-        descr.erase ("master_board_role");
         brainflow_boards_json["boards"][std::to_string (edx_board_id)]["default"] = descr;
     };
     clone_ant_edx_board (68, 24, "AntNeuroEE410EDX");

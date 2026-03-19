@@ -18,8 +18,6 @@ using json = nlohmann::json;
 
 namespace
 {
-constexpr int generic_edx_board_id = (int)BoardIds::ANT_NEURO_EDX_BOARD;
-
 bool is_ant_master_board (int board_id)
 {
     return ((board_id >= (int)BoardIds::ANT_NEURO_EE_410_BOARD &&
@@ -177,8 +175,7 @@ AntNeuroEdxBoard::AntNeuroEdxBoard (int board_id, struct BrainFlowInputParams pa
     is_streaming = false;
     state = (int)BrainFlowExitCodes::SYNC_TIMEOUT_ERROR;
     amplifier_handle = -1;
-    requested_master_board =
-        (board_id == generic_edx_board_id) ? params.master_board : explicit_edx_to_master_board (board_id);
+    requested_master_board = explicit_edx_to_master_board (board_id);
     package_num = 0;
     impedance_mode = false;
     sampling_rate = -1;
@@ -206,23 +203,19 @@ AntNeuroEdxBoard::~AntNeuroEdxBoard ()
 
 int AntNeuroEdxBoard::validate_master_board ()
 {
-    if (board_id != generic_edx_board_id)
+    if (requested_master_board == (int)BoardIds::NO_BOARD)
     {
-        if (requested_master_board == (int)BoardIds::NO_BOARD)
-        {
-            safe_logger (spdlog::level::err,
-                "failed to map explicit EDX board {} to ANT master board", board_id);
-            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
-        }
-        if ((params.master_board != (int)BoardIds::NO_BOARD) &&
-            (params.master_board != requested_master_board))
-        {
-            safe_logger (spdlog::level::err,
-                "explicit EDX board {} conflicts with master_board {} (expected {})",
-                board_id, params.master_board, requested_master_board);
-            return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
-        }
-        return (int)BrainFlowExitCodes::STATUS_OK;
+        safe_logger (spdlog::level::err,
+            "failed to map explicit EDX board {} to ANT master board", board_id);
+        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
+    }
+    if ((params.master_board != (int)BoardIds::NO_BOARD) &&
+        (params.master_board != requested_master_board))
+    {
+        safe_logger (spdlog::level::err,
+            "explicit EDX board {} conflicts with master_board {} (expected {})",
+            board_id, params.master_board, requested_master_board);
+        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
     if (!is_ant_master_board (requested_master_board))
     {
@@ -481,8 +474,7 @@ int AntNeuroEdxBoard::prepare_session ()
 
     try
     {
-        int descr_board_id =
-            (board_id == generic_edx_board_id) ? requested_master_board : board_id;
+        int descr_board_id = board_id;
         board_descr =
             boards_struct.brainflow_boards_json["boards"][std::to_string (descr_board_id)];
         sampling_rate = board_descr["default"]["sampling_rate"];
@@ -533,8 +525,7 @@ int AntNeuroEdxBoard::prepare_session ()
         return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
     // Device-discovered capabilities refine validation and configuration.
-    // Generic board 67 derives its public descriptor from master_board, while
-    // explicit EDX board ids are self-describing.
+    // Explicit EDX board ids remain self-describing.
 
     initialized = true;
     return (int)BrainFlowExitCodes::STATUS_OK;

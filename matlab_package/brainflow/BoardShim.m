@@ -360,10 +360,9 @@ classdef BoardShim
             obj.input_params_json = input_params.to_json();
             obj.board_id = int32(board_id);
             obj.master_board_id = obj.board_id;
-            board_descr = BoardShim.get_board_descr(board_id, int32(BrainFlowPresets.DEFAULT_PRESET));
-            if isfield(board_descr, 'requires_master_board') && board_descr.requires_master_board
+            if((board_id == int32(BoardIds.STREAMING_BOARD)) ||(board_id == int32(BoardIds.PLAYBACK_FILE_BOARD)))
                 if (input_params.master_board == int32(BoardIds.NO_BOARD))
-                    error('You need to provide master board id for boards with derived runtime layout');
+                    error('You need to provide master board id for streaming or playback boards');
                 end
                 obj.master_board_id = input_params.master_board;
             end

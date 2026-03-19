@@ -264,7 +264,6 @@ int prepare_session (int board_id, const char *json_brainflow_input_params)
                 new AntNeuroBoard ((int)BoardIds::ANT_NEURO_EE_511_BOARD, params));
             break;
 #ifdef BUILD_ANT_EDX
-        case BoardIds::ANT_NEURO_EDX_BOARD:
         case BoardIds::ANT_NEURO_EE_410_EDX_BOARD:
         case BoardIds::ANT_NEURO_EE_411_EDX_BOARD:
         case BoardIds::ANT_NEURO_EE_430_EDX_BOARD:

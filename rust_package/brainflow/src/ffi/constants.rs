@@ -102,7 +102,6 @@ pub enum BoardIds {
     BiolistenerBoard = 64,
     Ironbci32Board = 65,
     NeuropawnKnightBoardImu = 66,
-    AntNeuroEdxBoard = 67,
     AntNeuroEe410EdxBoard = 68,
     AntNeuroEe411EdxBoard = 69,
     AntNeuroEe430EdxBoard = 70,
