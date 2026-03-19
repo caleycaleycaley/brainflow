@@ -189,40 +189,12 @@ If your devices uses TCP/IP to send data, you need to run docker container with 
 Compilation of Core Module and C++ Binding
 -------------------------------------------
 
-Conan-first dependency workflow (optional)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Use Conan when you want dependency resolution managed for EDX builds. EDX dependencies are
-pulled only when :code:`ant_edx=True`.
-
-.. compound::
-
-    Windows (Visual Studio) example: ::
-
-        # package with default options (no EDX deps)
-        conan create . demo/testing
-
-        # package with EDX enabled (pulls protobuf + grpc)
-        conan create . demo/testing -o ant_edx=True -o static_msvc_runtime=False --build=missing
-
-.. compound::
-
-    Linux (Ubuntu/WSL) example: ::
-
-        # package with default options (no EDX deps)
-        conan create . demo/testing
-
-        # package with EDX enabled (pulls protobuf + grpc)
-        conan create . demo/testing -o ant_edx=True --build=missing
-
-If Conan is not available, use the system-package flow below.
-
 Windows
 ~~~~~~~~
 
 - Install CMake>=3.16 you can install it from PYPI via pip or from `CMake website <https://cmake.org/>`_
-- Install Visual Studio 2019(preferred) or Visual Studio 2017. Other versions may work but not tested
-- In VS installer make sure you selected "Visual C++ ATL support"
+- Install Visual Studio with C++ build tools
+- In Visual Studio installer make sure you selected "Visual C++ ATL support"
 - Build it as a standard CMake project, you don't need to set any options
 
 .. compound::
@@ -240,18 +212,13 @@ Windows
 
     EDX profile on Windows (gRPC transport) example: ::
 
+        # make sure gRPC and protobuf are available in your CMake toolchain,
+        # for example via vcpkg or another preinstalled toolchain package
+
         mkdir build-edx
         cd build-edx
         cmake -G "Visual Studio 17 2022" -A x64 -DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic -DCMAKE_INSTALL_PREFIX=../installed-edx ..
         cmake --build . --target install --config Release -j 2 --parallel 2
-
-    Runtime contract for ANT Neuro EDX boards:
-
-    - Explicit EDX board ids are self-describing and do not require :code:`master_board`.
-    - :code:`ANT_NEURO_EDX_BOARD (67)` remains the generic joker path and requires :code:`master_board`.
-    - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
-    - :code:`other_info` is not supported for EDX endpoint configuration.
-    - For board :code:`67`, runtime row layout is derived from :code:`master_board`.
 
 
 Linux
@@ -287,13 +254,7 @@ Linux
         make
         make install
 
-    Runtime contract for ANT Neuro EDX boards:
-
-    - Explicit EDX board ids are self-describing and do not require :code:`master_board`.
-    - :code:`ANT_NEURO_EDX_BOARD (67)` remains the generic joker path and requires :code:`master_board`.
-    - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
-    - :code:`other_info` is not supported for EDX endpoint configuration.
-    - For board :code:`67`, runtime row layout is derived from :code:`master_board`.
+For EDX board configuration details, see :ref:`ant-neuro-edx-label`.
 
 MacOS
 ~~~~~~~

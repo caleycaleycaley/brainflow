@@ -1171,20 +1171,13 @@ Use board id:
   - :code:`BoardIds.ANT_NEURO_EE_224_EDX_BOARD`
   - :code:`BoardIds.ANT_NEURO_EE_225_EDX_BOARD`
   - :code:`BoardIds.ANT_NEURO_EE_511_EDX_BOARD`
-- :code:`BoardIds.ANT_NEURO_EDX_BOARD`
 
-Use one of the explicit EDX ids when you know the amplifier model. Keep
-:code:`BoardIds.ANT_NEURO_EDX_BOARD` as the generic joker path for future or
-not-yet-modeled ANT boards.
+Use one of the explicit EDX ids when you know the amplifier model.
 
 Required BrainFlowInputParams fields:
 
 - :code:`ip_address`, EDX service host (for example :code:`localhost`)
 - :code:`ip_port`, EDX service port (for example :code:`3390`)
-
-Additional requirement for the generic board 67 path only:
-
-- :code:`master_board`, descriptor source board id (for example :code:`BoardIds.ANT_NEURO_EE_511_BOARD`)
 
 Optional fields:
 
@@ -1194,9 +1187,16 @@ Optional fields:
 Important notes:
 
 - Explicit EDX ids are self-describing and do not require :code:`master_board`.
-- Runtime data layout for board 67 is always derived from :code:`master_board`.
-- Device-discovered capabilities such as rates, ranges and impedance support refine validation and configuration, but do not silently replace the public descriptor layout.
-- :code:`other_info` endpoint format (for example :code:`localhost:3390`) is not supported for board 67.
+- Available sampling rates and signal ranges are discovered from the amplifier at runtime via :code:`board.config_board("edx:get_capabilities")`.
+- BrainFlow also exposes :code:`BoardIds.ANT_NEURO_EDX_BOARD` as a generic wrapper path, but it still requires :code:`master_board`, so the direct EDX ids above are the preferred user-facing option.
+
+Available commands:
+
+- Get runtime capabilities: :code:`board.config_board("edx:get_capabilities")`
+- Set sampling rate: :code:`board.config_board("sampling_rate:500")`
+- Set reference range: :code:`board.config_board("reference_range:0.15")`
+- Set bipolar range: :code:`board.config_board("bipolar_range:2.5")`
+- Set impedance mode: :code:`board.config_board("impedance_mode:1")`, mode 0 or 1
 
 Initialization example (Python):
 
@@ -1208,16 +1208,21 @@ Initialization example (Python):
     params.ip_protocol = IpProtocolTypes.EDX
     board = BoardShim(BoardIds.ANT_NEURO_EE_511_EDX_BOARD, params)
 
-Generic joker path example (Python):
+Configuration example (Python):
 
 .. code-block:: python
 
     params = BrainFlowInputParams()
-    params.master_board = BoardIds.ANT_NEURO_EE_511_BOARD
     params.ip_address = "localhost"
     params.ip_port = 3390
     params.ip_protocol = IpProtocolTypes.EDX
-    board = BoardShim(BoardIds.ANT_NEURO_EDX_BOARD, params)
+    board = BoardShim(BoardIds.ANT_NEURO_EE_511_EDX_BOARD, params)
+    board.prepare_session()
+    print(board.config_board("edx:get_capabilities"))
+    board.config_board("sampling_rate:500")
+    board.config_board("reference_range:0.15")
+    board.config_board("bipolar_range:2.5")
+    board.start_stream()
 
 Initialization example (C++):
 
@@ -1229,6 +1234,23 @@ Initialization example (C++):
     params.ip_protocol = (int)IpProtocolTypes::EDX;
     BoardShim board ((int)BoardIds::ANT_NEURO_EE_511_EDX_BOARD, params);
 
+Configuration example (C++):
+
+.. code-block:: cpp
+
+    BrainFlowInputParams params;
+    params.ip_address = "localhost";
+    params.ip_port = 3390;
+    params.ip_protocol = (int)IpProtocolTypes::EDX;
+
+    BoardShim board ((int)BoardIds::ANT_NEURO_EE_511_EDX_BOARD, params);
+    board.prepare_session ();
+    std::string caps = board.config_board ("edx:get_capabilities");
+    board.config_board ("sampling_rate:500");
+    board.config_board ("reference_range:0.15");
+    board.config_board ("bipolar_range:2.5");
+    board.start_stream ();
+
 Initialization example (Rust):
 
 .. code-block:: rust
@@ -1239,6 +1261,23 @@ Initialization example (Rust):
         .ip_protocol(IpProtocolTypes::Edx)
         .build();
     let board = BoardShim::new(BoardIds::AntNeuroEe511EdxBoard, params)?;
+
+Configuration example (Rust):
+
+.. code-block:: rust
+
+    let params = BrainFlowInputParamsBuilder::default()
+        .ip_address("localhost")
+        .ip_port(3390)
+        .ip_protocol(IpProtocolTypes::Edx)
+        .build();
+    let board = BoardShim::new(BoardIds::AntNeuroEe511EdxBoard, params)?;
+    board.prepare_session()?;
+    let caps = board.config_board("edx:get_capabilities")?;
+    board.config_board("sampling_rate:500")?;
+    board.config_board("reference_range:0.15")?;
+    board.config_board("bipolar_range:2.5")?;
+    board.start_stream(45000, "")?;
 
 Enophone
 ---------
