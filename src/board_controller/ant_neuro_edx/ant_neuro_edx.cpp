@@ -593,6 +593,9 @@ int AntNeuroEdxBoard::set_idle_mode ()
     EdigRPC::gen::Amplifier_SetModeRequest request;
     request.set_amplifierhandle (amplifier_handle);
     request.set_mode (EdigRPC::gen::AmplifierMode::AmplifierMode_Idle);
+    // Allocate an empty StreamParams so the server doesn't dereference null,
+    // but don't populate channels/rates — idle doesn't need them.
+    request.mutable_streamparams ();
     EdigRPC::gen::Amplifier_SetModeResponse response;
 
     grpc::ClientContext ctx;
