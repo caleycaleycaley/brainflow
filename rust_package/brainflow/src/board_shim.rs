@@ -16,6 +16,15 @@ use crate::ffi::board_controller;
 
 const MAX_CHANNELS: usize = 512;
 
+fn requires_master_board(board_id: BoardIds) -> Result<bool> {
+    let board_descr = get_board_descr(board_id, BrainFlowPresets::DefaultPreset)?;
+    let board_descr: serde_json::Value = serde_json::from_str(&board_descr)?;
+    Ok(board_descr
+        .get("requires_master_board")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false))
+}
+
 /// BoardShim is a primary interface to all boards
 pub struct BoardShim {
     board_id: BoardIds,
@@ -29,8 +38,13 @@ impl BoardShim {
         let json_brainflow_input_params = serde_json::to_string(&input_params)?;
         let json_brainflow_input_params = CString::new(json_brainflow_input_params)?;
         let master_board_id =
-            if let BoardIds::StreamingBoard | BoardIds::PlaybackFileBoard = board_id {
-                num::FromPrimitive::from_usize(*input_params.master_board()).unwrap()
+            if requires_master_board(board_id)? {
+                let master_board_raw = *input_params.master_board();
+                if master_board_raw == BoardIds::NoBoard as usize {
+                    return Err(crate::BrainFlowError::InvalidArgumentsError.into());
+                }
+                num::FromPrimitive::from_usize(master_board_raw)
+                    .ok_or(crate::BrainFlowError::InvalidArgumentsError)?
             } else {
                 board_id
             };
@@ -167,7 +181,7 @@ impl BoardShim {
 
     /// Get board data and remove data from ringbuffer
     pub fn get_board_data(&self, n_data_points: Option<usize>, preset: BrainFlowPresets) -> Result<Array2<f64>> {
-        let num_rows = get_num_rows(self.board_id, preset)?;
+        let num_rows = get_num_rows(self.master_board_id, preset)?;
         let num_samples = if let Some(n) = n_data_points {
             self.get_board_data_count(preset)?.min(n)
         } else {
@@ -194,7 +208,7 @@ impl BoardShim {
 
     /// Get specified amount of data or less if there is not enough data, doesnt remove data from ringbuffer.
     pub fn get_current_board_data(&self, num_samples: usize, preset: BrainFlowPresets) -> Result<Array2<f64>> {
-        let num_rows = get_num_rows(self.board_id, preset)?;
+        let num_rows = get_num_rows(self.master_board_id, preset)?;
         let capacity = num_samples * num_rows;
         let mut len = 0;
         let mut data_buf = Vec::with_capacity(capacity);

@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.IO;
+using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 
@@ -11,13 +12,20 @@ namespace brainflow
     /// </summary>
     public class BoardShim
     {
+        [DataContract]
+        private class MasterBoardRequirement
+        {
+            [DataMember (Name = "requires_master_board")]
+            public bool requires_master_board;
+        }
+
         /// <summary>
         /// BrainFlow's board id
         /// </summary>
         public int board_id;
         public BrainFlowInputParams input_params;
         private string input_json;
-        private int master_board; // for streaming board
+        private int master_board; // effective descriptor source board id
 
         /// <summary>
         /// Create an instance of BoardShim class
@@ -29,7 +37,7 @@ namespace brainflow
             this.board_id = board_id;
             this.input_params = input_params;
 
-            if ((board_id == (int)BoardIds.STREAMING_BOARD) || (board_id == (int)BoardIds.PLAYBACK_FILE_BOARD))
+            if (requires_master_board (board_id))
             {
                 if (input_params.master_board != (int)BoardIds.NO_BOARD)
                 {
@@ -46,6 +54,12 @@ namespace brainflow
             }
 
             input_json = input_params.to_json ();
+        }
+
+        private static bool requires_master_board (int board_id)
+        {
+            MasterBoardRequirement descr = get_board_descr<MasterBoardRequirement> (board_id);
+            return descr.requires_master_board;
         }
 
         /// <summary>
@@ -987,3 +1001,4 @@ namespace brainflow
         }
     }
 }
+

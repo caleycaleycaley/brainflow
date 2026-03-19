@@ -189,6 +189,34 @@ If your devices uses TCP/IP to send data, you need to run docker container with 
 Compilation of Core Module and C++ Binding
 -------------------------------------------
 
+Conan-first dependency workflow (optional)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use Conan when you want dependency resolution managed for EDX builds. EDX dependencies are
+pulled only when :code:`ant_edx=True`.
+
+.. compound::
+
+    Windows (Visual Studio) example: ::
+
+        # package with default options (no EDX deps)
+        conan create . demo/testing
+
+        # package with EDX enabled (pulls protobuf + grpc)
+        conan create . demo/testing -o ant_edx=True -o static_msvc_runtime=False --build=missing
+
+.. compound::
+
+    Linux (Ubuntu/WSL) example: ::
+
+        # package with default options (no EDX deps)
+        conan create . demo/testing
+
+        # package with EDX enabled (pulls protobuf + grpc)
+        conan create . demo/testing -o ant_edx=True --build=missing
+
+If Conan is not available, use the system-package flow below.
+
 Windows
 ~~~~~~~~
 
@@ -208,6 +236,23 @@ Windows
         # to get info about args and configure your build you can run
         python build.py --help
 
+.. compound::
+
+    EDX profile on Windows (gRPC transport) example: ::
+
+        mkdir build-edx
+        cd build-edx
+        cmake -G "Visual Studio 17 2022" -A x64 -DBUILD_ANT_EDX=ON -DMSVC_RUNTIME=dynamic -DCMAKE_INSTALL_PREFIX=../installed-edx ..
+        cmake --build . --target install --config Release -j 2 --parallel 2
+
+    Runtime contract for ANT Neuro EDX boards:
+
+    - Explicit EDX board ids are self-describing and do not require :code:`master_board`.
+    - :code:`ANT_NEURO_EDX_BOARD (67)` remains the generic joker path and requires :code:`master_board`.
+    - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
+    - :code:`other_info` is not supported for EDX endpoint configuration.
+    - For board :code:`67`, runtime row layout is derived from :code:`master_board`.
+
 
 Linux
 ~~~~~~
@@ -226,6 +271,29 @@ Linux
         python3 build.py
         # to get info about args and configure your build you can run
         python3 build.py --help
+
+.. compound::
+
+    EDX profile on Linux example: ::
+
+        # install grpc/protobuf development dependencies first
+        # protobuf-compiler-grpc provides grpc_cpp_plugin used by CMake
+        sudo apt-get update
+        sudo apt-get install -y libprotobuf-dev protobuf-compiler libgrpc++-dev protobuf-compiler-grpc
+
+        mkdir build-edx
+        cd build-edx
+        cmake -DBUILD_ANT_EDX=ON -DBUILD_SYNCHRONI_SDK=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../installed-edx ..
+        make
+        make install
+
+    Runtime contract for ANT Neuro EDX boards:
+
+    - Explicit EDX board ids are self-describing and do not require :code:`master_board`.
+    - :code:`ANT_NEURO_EDX_BOARD (67)` remains the generic joker path and requires :code:`master_board`.
+    - Use :code:`ip_address` and :code:`ip_port` for endpoint configuration.
+    - :code:`other_info` is not supported for EDX endpoint configuration.
+    - For board :code:`67`, runtime row layout is derived from :code:`master_board`.
 
 MacOS
 ~~~~~~~
